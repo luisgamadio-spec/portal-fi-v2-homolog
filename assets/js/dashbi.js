@@ -1191,7 +1191,9 @@
       // authenticated identity), never renamed in the raw payload
       // (backend contract untouched -- Gate 7 Option A) but labeled here
       // so it can't be misread as Auth Context's own separate isMaster.
-      ((isReal && (!window.NX_ENVIRONMENT || !window.NX_ENVIRONMENT.production))
+      // development diagnostics: localhost with ?debug=1 only (NX_DEV), never homolog/production
+      (!(window.NX_DEV && window.NX_DEV.ativo) ? '' :
+      (isReal
         ? '<h2>Diagnóstico (dev only)</h2><p class="dbMuted">Fonte: backend real (operational_metrics / operational_model_metrics). "is_master" no escopo abaixo é o escopo analítico efetivo desta chamada (elevação de grupo autorizada pelo servidor), não a identidade autenticada. Escopo: <span class="dbDiagJson">' + esc(JSON.stringify(out.sourceInfo)) + '</span></p>'
         : (isReal ? '' :
           '<h2>Diagnóstico (dev only)</h2>' +
@@ -1199,7 +1201,7 @@
           '<p class="dbMuted">Entrada (bases novas): total financiamentos ' + out.entradaDiagnostic.totalFinanciamentos +
           ' · chassis localizados ' + out.entradaDiagnostic.chassisLocalizados +
           ' · não localizados ' + out.entradaDiagnostic.chassisNaoLocalizados +
-          ' · taxa de sucesso ' + A.pct(out.entradaDiagnostic.taxaSucesso) + '</p>'));
+          ' · taxa de sucesso ' + A.pct(out.entradaDiagnostic.taxaSucesso) + '</p>')));
 
     panel.innerHTML = html;
   }

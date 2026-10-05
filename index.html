@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Portal F&amp;I V2 — Foundation (NEXT_LOCAL)</title>
+<title>Portal F&amp;I</title>
 <link rel="stylesheet" href="assets/css/vendor/fonts.css">
 <link rel="stylesheet" href="assets/css/vendor/design-tokens.css">
 <link rel="stylesheet" href="assets/css/shell.css">
@@ -54,7 +54,9 @@
   <div id="nxOverlayRoot" aria-hidden="true"></div>
   <div id="nxModalRoot" aria-hidden="true"></div>
 
-  <div class="nxDevBadge">
+  <!-- dev badge + design trace: hidden by default; shell.js shows them only when
+       NX_DEV.ativo (localhost/127.0.0.1 with ?debug=1) -->
+  <div class="nxDevBadge" id="nxDevBadge" hidden>
     <span class="nxDevDot" aria-hidden="true"></span>
     <span>V2 LOCAL · NEXT_LOCAL — não é produção</span>
     <!-- IA-3H.1A Section 10/11 -- local/homolog-only Voice UAT provenance

@@ -87,7 +87,7 @@
   // from this simulated value (Section 12/client-state-safety).
   function scSimulateWrite(name, params) {
     if (typeof console !== 'undefined' && console.warn) {
-      console.warn('[Mudança de Loja] MODO HOMOLOGAÇÃO — escrita bloqueada: ' + name, Object.keys(params || {}));
+      if (window.NX_DEV) window.NX_DEV.warn('[Mudança de Loja] MODO HOMOLOGAÇÃO — escrita bloqueada: ' + name, Object.keys(params || {})); // RPC/param names: localhost with ?debug=1 only
     }
     return { ok: true, simulated: true };
   }

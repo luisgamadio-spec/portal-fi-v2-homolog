@@ -1348,7 +1348,7 @@
   diag.calculoAplicado = diag.chassisLocalizados > 0;
   diagnosticoEntradaNova = diag;
 
-  console.info("[Entrada Média - Bases Novas]", {
+  if (window.NX_DEV && window.NX_DEV.ativo) console.info("[Entrada Média - Bases Novas]", { // diagnostic rows: localhost with ?debug=1 only
     totalFinanciamentos: diag.totalFinanciamentos,
     chassisLocalizados: diag.chassisLocalizados,
     chassisNaoLocalizados: diag.chassisNaoLocalizados,

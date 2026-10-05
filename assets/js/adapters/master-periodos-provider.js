@@ -68,7 +68,7 @@
   // simulated value (Section 12/client-state-safety).
   function prSimulateWrite(name, params) {
     if (typeof console !== 'undefined' && console.warn) {
-      console.warn('[Períodos de Comissão] MODO HOMOLOGAÇÃO — escrita bloqueada: ' + name, Object.keys(params || {}));
+      if (window.NX_DEV) window.NX_DEV.warn('[Períodos de Comissão] MODO HOMOLOGAÇÃO — escrita bloqueada: ' + name, Object.keys(params || {})); // RPC/param names: localhost with ?debug=1 only
     }
     return { ok: true, simulated: true };
   }

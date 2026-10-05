@@ -59,7 +59,7 @@
   // beyond the required `simulated` marker.
   function cfgSimulateWrite(name, params) {
     if (typeof console !== 'undefined' && console.warn) {
-      console.warn('[Configurações] MODO HOMOLOGAÇÃO — escrita bloqueada: ' + name, Object.keys(params || {}));
+      if (window.NX_DEV) window.NX_DEV.warn('[Configurações] MODO HOMOLOGAÇÃO — escrita bloqueada: ' + name, Object.keys(params || {})); // RPC/param names: localhost with ?debug=1 only
     }
     return { ok: true, simulated: true };
   }

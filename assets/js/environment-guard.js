@@ -98,6 +98,21 @@
   // DOMContentLoaded below, after every earlier script has executed.
   window.NX_ENVIRONMENT = classifyEnvironment();
   window.NX_ENVIRONMENT.checkedAt = new Date().toISOString();
+
+  // Development aids (diagnostic blocks, dev badge, design trace, verbose console):
+  // ONLY on localhost/127.0.0.1 AND with ?debug=1 in the URL — never on homolog or
+  // production, whatever the URL says. Hostname-only, so it is safe to read early.
+  window.NX_DEV = (function () {
+    var host = (typeof location !== 'undefined' && location.hostname) || '';
+    var debug = false;
+    try { debug = new URLSearchParams(location.search).get('debug') === '1'; } catch (e) { debug = false; }
+    var ativo = LOCAL_DEV_HOSTNAMES.indexOf(host) !== -1 && debug;
+    return {
+      ativo: ativo,
+      log: function () { if (ativo && window.console) console.log.apply(console, arguments); },
+      warn: function () { if (ativo && window.console) console.warn.apply(console, arguments); }
+    };
+  })();
   window.NX_ENVIRONMENT.production = false; // legacy field, preserved for any existing consumer; superseded by .name
 
   document.addEventListener('DOMContentLoaded', function () {

@@ -66,7 +66,7 @@
         mostrarStatusAnalista('Analista encontrado, mas WhatsApp não cadastrado.');
         return;
       }
-      console.info('[fi-atendimento] origem do clique:', origin || '(não informado)');
+      if (window.NX_DEV) window.NX_DEV.log('[fi-atendimento] origem do clique:', origin || '(não informado)');
       mostrarStatusAnalista('Analista encontrado: ' + String(analista.nome || '') + '. Abrindo WhatsApp...');
       var mensagem = encodeURIComponent('Olá, preciso de apoio em uma simulação F&I.');
       setTimeout(function () {

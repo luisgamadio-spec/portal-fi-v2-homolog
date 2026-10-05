@@ -80,7 +80,7 @@
       // the values -- params here can carry CPF, names, and other
       // ausencias_analistas fields; the shape (which fields were sent)
       // is enough to diagnose a homolog-mode block, the values are not.
-      console.warn('[Férias/Ausências] MODO HOMOLOGAÇÃO — escrita bloqueada: ' + name, Object.keys(params || {}));
+      if (window.NX_DEV) window.NX_DEV.warn('[Férias/Ausências] MODO HOMOLOGAÇÃO — escrita bloqueada: ' + name, Object.keys(params || {})); // RPC/param names: localhost with ?debug=1 only
     }
     return { ok: true, simulated: true };
   }

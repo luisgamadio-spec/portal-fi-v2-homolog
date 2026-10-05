@@ -255,6 +255,7 @@ html, body {
   pointer-events: auto;
 }
 .nxDesignTrace[hidden] { display: none; }
+.nxDevBadge[hidden] { display: none; } /* dev badge: localhost with ?debug=1 only (NX_DEV) */
 .nxDesignTrace h2 {
   font-family: var(--font-mono);
   font-size: 10px;

@@ -70,7 +70,7 @@
   }
   function gsSimulateWrite(name, params) {
     if (typeof console !== 'undefined' && console.warn) {
-      console.warn('[Gestão dos Simuladores] MODO HOMOLOGAÇÃO — escrita bloqueada: ' + name, Object.keys(params || {}));
+      if (window.NX_DEV) window.NX_DEV.warn('[Gestão dos Simuladores] MODO HOMOLOGAÇÃO — escrita bloqueada: ' + name, Object.keys(params || {})); // RPC/param names: localhost with ?debug=1 only
     }
     var fakeUuid = '00000000-0000-4000-8000-' + Math.random().toString(16).slice(2).padEnd(12, '0').slice(0, 12);
     return { ok: true, simulated: true, batch_id: fakeUuid };

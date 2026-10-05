@@ -63,6 +63,8 @@
       '<h1>' + (entry.landingTitle || entry.name) + '</h1>' +
       '<p>Em preparação para o Portal V2. Esta área ainda não está disponível — volte em breve.</p>' +
       '<a class="nxDeferredHome" href="#/landing">Voltar para o início</a>' +
+      // registry metadata is development info: localhost with ?debug=1 only
+      (devAtivo() ?
       '<details class="nxMetaDetails"><summary>Detalhes técnicos</summary>' +
       '<dl class="nxMeta">' +
       '<dt>rota</dt><dd>#/' + entry.id + '</dd>' +
@@ -71,7 +73,7 @@
       '<dt>autenticação</dt><dd>' + entry.authRequirement + '</dd>' +
       '<dt>padrão de design</dt><dd>' + entry.designPattern + '</dd>' +
       '<dt>wave</dt><dd>' + entry.migrationWave + '</dd>' +
-      '</dl></details>' +
+      '</dl></details>' : '') +
       '</div>';
     if (moveFocus) outlet.focus();
   }
@@ -237,14 +239,25 @@
       }
     }).then(function () {
       if (myToken !== routeToken) return;
-      window.NX_DESIGN_TRACE.render(entry, routeId);
+      if (devAtivo()) window.NX_DESIGN_TRACE.render(entry, routeId);
       hasRenderedOnce = true;
     });
   }
 
+  function devAtivo() { return !!(window.NX_DEV && window.NX_DEV.ativo); }
+
+  // Dev badge + design trace: only on localhost with ?debug=1 (NX_DEV); elsewhere
+  // they stay hidden and the trace panel is never filled.
   function setupDevBadge() {
+    var badge = document.getElementById('nxDevBadge');
     var toggleBtn = document.getElementById('nxDesignTraceToggle');
     var panel = document.getElementById('nxDesignTrace');
+    if (!devAtivo() || !badge || !toggleBtn || !panel) {
+      if (badge) badge.hidden = true;
+      if (panel) panel.hidden = true;
+      return;
+    }
+    badge.hidden = false;
     toggleBtn.addEventListener('click', function () {
       var isHidden = panel.hasAttribute('hidden');
       if (isHidden) panel.removeAttribute('hidden');
@@ -400,11 +413,13 @@
       window.NX_ROUTER.onChange(onRouteChange);
       return window.NX_AUTH_CORE.boot();
     }).catch(function () {
-      document.getElementById('nxContentOutlet').innerHTML =
-        '<div class="nxPlaceholder"><h1>Registry failed to load</h1>' +
-        '<p>config/module-registry.json could not be fetched. If you ' +
-        'opened this file directly (file://), start a local server ' +
-        'instead — see docs/DEVELOPMENT.md.</p></div>';
+      document.getElementById('nxContentOutlet').innerHTML = devAtivo()
+        ? '<div class="nxPlaceholder"><h1>Registry failed to load</h1>' +
+          '<p>config/module-registry.json could not be fetched. If you ' +
+          'opened this file directly (file://), start a local server ' +
+          'instead — see docs/DEVELOPMENT.md.</p></div>'
+        : '<div class="nxPlaceholder"><h1>Não foi possível carregar o Portal</h1>' +
+          '<p>Recarregue a página. Se o problema continuar, tente novamente em alguns minutos.</p></div>';
     });
   }
   document.addEventListener('DOMContentLoaded', boot);

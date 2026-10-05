@@ -48,7 +48,8 @@
       var url = typeof input === 'string' ? input : (input && input.url) || '';
       if (window.NX_NETWORK_GUARD.isRealBackendUrl(url)) {
         window.NX_NETWORK_GUARD.flaggedRequests.push({ method: 'fetch', url: url, at: new Date().toISOString() });
-        console.error('[network-guard] BLOCKED-BY-POLICY (flagged, not silently allowed): fetch to real backend host:', url);
+        // the full request URL is development info: console only on localhost with ?debug=1
+        if (window.NX_DEV && window.NX_DEV.ativo) console.error('[network-guard] BLOCKED-BY-POLICY (flagged, not silently allowed): fetch to real backend host:', url);
       }
       return origFetch.apply(this, arguments);
     };
@@ -60,7 +61,7 @@
     OrigXHR.prototype.open = function (method, url) {
       if (window.NX_NETWORK_GUARD.isRealBackendUrl(url)) {
         window.NX_NETWORK_GUARD.flaggedRequests.push({ method: 'xhr:' + method, url: url, at: new Date().toISOString() });
-        console.error('[network-guard] FLAGGED: XHR to real backend host:', url);
+        if (window.NX_DEV && window.NX_DEV.ativo) console.error('[network-guard] FLAGGED: XHR to real backend host:', url);
       }
       return origOpen.apply(this, arguments);
     };
