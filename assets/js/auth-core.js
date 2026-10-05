@@ -63,6 +63,9 @@
   var state = STATES.INITIALIZING_SESSION;
   var context = null; // Auth Context, null unless state === AUTHORIZED
   var listeners = [];
+  var aviso = null;   // notice for the login screen after the session guard ends a session
+
+  function guard() { return window.NX_SESSION_GUARD || null; }
 
   function setState(next, extra) {
     state = next;
@@ -167,7 +170,9 @@
         return Promise.resolve();
       }
       setState(STATES.AUTHENTICATING);
+      aviso = null;
       return window.NX_AUTH.signIn(email, password, captchaToken).then(function () {
+        if (guard()) guard().iniciarSessao(); // the 10 h limit counts from this login
         return resolveAfterSession();
       }).catch(function (err) {
         context = null;
@@ -181,6 +186,7 @@
     },
 
     logout: function () {
+      if (guard()) guard().limparSessao();
       return window.NX_AUTH.signOut().then(function () {
         context = null;
         setState(STATES.SIGNED_OUT);
@@ -201,6 +207,19 @@
       context = null;
       setState(STATES.SESSION_EXPIRED);
     },
+
+    // Session guard (inactivity / maximum age): ends THIS tab's session and returns to
+    // login with `msg`. The state changes BEFORE signOut so the SIGNED_OUT event that
+    // signOut emits can't overwrite it (the listener below only acts on AUTHORIZED).
+    encerrarSessao: function (msg) {
+      if (state !== STATES.AUTHORIZED) return Promise.resolve();
+      context = null;
+      aviso = msg || null;
+      setState(STATES.SESSION_EXPIRED, { aviso: aviso });
+      return window.NX_AUTH.signOut().catch(function () { /* local state already cleared */ });
+    },
+
+    getAviso: function () { return aviso; },
 
     // AUTH FOUNDATION Phase 2B, Gate 9/26: the ONE authorization-
     // decision implementation, consumed by both shell.js's route
@@ -248,8 +267,13 @@
     try {
       window.NX_AUTH.onAuthStateChange(function (event) {
         if (event === 'SIGNED_OUT' && state === STATES.AUTHORIZED) {
-          context = null;
-          setState(STATES.SIGNED_OUT);
+          // Session per tab: supabase-js relays auth events from OTHER tabs (a logout there,
+          // or a duplicated tab clearing its copy). Only leave if THIS tab has no session.
+          window.NX_AUTH.getSession().then(function (session) {
+            if (session || state !== STATES.AUTHORIZED) return;
+            context = null;
+            setState(STATES.SIGNED_OUT);
+          }, function () { /* keep the current state; the next RPC will report expiry */ });
         }
       });
     } catch (e) {

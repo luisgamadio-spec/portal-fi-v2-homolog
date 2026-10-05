@@ -2195,6 +2195,14 @@
     }
   }
 
+  // Session guard: a question in progress, a voice recording or an answer being spoken
+  // (or its pieces still loading) counts as use for the 30-min inactivity rule.
+  if (window.NX_SESSION_GUARD) {
+    window.NX_SESSION_GUARD.registrarOcupado(function () {
+      return chat.enviando || voz.estado !== 'repouso' || !!voz.rec || !!voz.sessao;
+    });
+  }
+
   window.NX_INTELLIGENCE_PANEL = {
     mount: function () {
       if (window.NX_AUTH_CORE) window.NX_AUTH_CORE.onStateChange(function () { refreshVisibility(); });

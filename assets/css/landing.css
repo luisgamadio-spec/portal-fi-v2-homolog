@@ -265,6 +265,67 @@ body.nav-drawer-open .pNavBackdrop{display:block}
   .pBreadcrumbCurrent{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
 
+/* ============================================================
+   Menu recolhido em ícones dentro dos módulos (>= 1280 px only;
+   below that the drawer above is unchanged).
+   body.module-open (landing.js renderRoute) → 64 px icon rail,
+   fixed, opening to 232 px OVER the content (the page keeps a 64 px
+   gutter, so nothing is pushed). Opens on hover, keyboard focus or a
+   click on the rail (.nav-rail-aberto); an item click closes it until
+   the mouse leaves (.nav-rail-recolhido). body.nav-pinned = "fixar
+   menu aberto": the normal 232 px column, as on the landing.
+   ============================================================ */
+.pNavPin{display:none}
+@media(min-width:1280px){
+  body.module-open .pNavPin{
+    display:flex;align-items:center;gap:10px;margin:auto 8px 0;padding:8px 14px;border:0;border-left:2px solid transparent;
+    border-radius:var(--radius-sm);background:none;color:var(--color-text-muted);font-family:var(--font-ui);font-size:12px;cursor:pointer;text-align:left
+  }
+  body.module-open .pNavPin .pNavIcon{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  body.module-open .pNavPin:hover{color:var(--color-text-primary);background:rgba(255,255,255,.04)}
+  body.module-open .pNavPin:focus-visible{outline:var(--focus-ring);outline-offset:2px}
+  body.module-open.nav-pinned .pNavPin{color:var(--color-accent-primary)}
+
+  body.module-open:not(.nav-pinned) .pShell{padding-left:64px}
+  body.module-open:not(.nav-pinned) .pGlobalNav{
+    position:fixed;top:0;left:0;bottom:0;height:100vh;z-index:60;width:64px;overflow-x:hidden;overflow-y:auto
+  }
+  body.module-open:not(.nav-pinned) .pGlobalNav .pNavItem,
+  body.module-open:not(.nav-pinned) .pGlobalNav .pNavItemDeferred,
+  body.module-open:not(.nav-pinned) .pNavPin{padding-left:11px;padding-right:11px}
+  /* collapsed: labels/section titles take no space but stay in the accessibility tree */
+  body.module-open:not(.nav-pinned) .pNavLabel,
+  body.module-open:not(.nav-pinned) .pBrandWord,
+  body.module-open:not(.nav-pinned) .pNavSoon{flex:0 0 auto;max-width:0;opacity:0;overflow:hidden;padding:0;margin:0;border:0}
+  body.module-open:not(.nav-pinned) .pNavGroupLabel{height:0;margin:0;opacity:0;overflow:hidden}
+  body.module-open:not(.nav-pinned) .pNavGroup + .pNavGroup{margin-top:10px;padding-top:10px;border-top:1px solid var(--color-hairline)}
+  body.module-open:not(.nav-pinned) .pBrand{padding:0 12px;gap:0}
+  /* the wide BRABUS logo shrinks to fit the 64 px rail; full size again when the menu opens */
+  body.module-open:not(.nav-pinned) .pBrandLogo{max-width:40px;height:auto;flex-shrink:0}
+  body.module-open:not(.nav-pinned):not(.nav-rail-recolhido) .pGlobalNav:is(:hover,:focus-within) .pBrandLogo,
+  body.module-open.nav-rail-aberto:not(.nav-pinned) .pGlobalNav .pBrandLogo{max-width:none;height:15px}
+  body.module-open:not(.nav-pinned) .nxDevBadge{display:none}
+
+  /* open over the content: hover, keyboard focus, or a click on the rail */
+  body.module-open:not(.nav-pinned):not(.nav-rail-recolhido) .pGlobalNav:hover,
+  body.module-open:not(.nav-pinned):not(.nav-rail-recolhido) .pGlobalNav:focus-within,
+  body.module-open.nav-rail-aberto:not(.nav-pinned) .pGlobalNav{width:232px;box-shadow:var(--shadow-elevated)}
+  body.module-open:not(.nav-pinned):not(.nav-rail-recolhido) .pGlobalNav:is(:hover,:focus-within) :is(.pNavLabel,.pBrandWord,.pNavSoon),
+  body.module-open.nav-rail-aberto:not(.nav-pinned) .pGlobalNav :is(.pNavLabel,.pBrandWord,.pNavSoon){max-width:200px;opacity:1}
+  body.module-open:not(.nav-pinned):not(.nav-rail-recolhido) .pGlobalNav:is(:hover,:focus-within) .pBrandWord,
+  body.module-open.nav-rail-aberto:not(.nav-pinned) .pGlobalNav .pBrandWord{padding-left:9px;margin-left:9px;border-left:1px solid var(--color-hairline-strong)}
+  body.module-open:not(.nav-pinned):not(.nav-rail-recolhido) .pGlobalNav:is(:hover,:focus-within) .pNavGroupLabel,
+  body.module-open.nav-rail-aberto:not(.nav-pinned) .pGlobalNav .pNavGroupLabel{height:auto;margin:0 8px 6px;opacity:.75}
+  body.module-open:not(.nav-pinned):not(.nav-rail-recolhido) .pGlobalNav:is(:hover,:focus-within) .pNavGroup + .pNavGroup,
+  body.module-open.nav-rail-aberto:not(.nav-pinned) .pGlobalNav .pNavGroup + .pNavGroup{margin-top:16px;padding-top:0;border-top:0}
+
+  @media(prefers-reduced-motion:no-preference){
+    body.module-open:not(.nav-pinned) .pGlobalNav{transition:width .18s var(--ease-precise) .06s,box-shadow .18s var(--ease-precise)}
+    body.module-open:not(.nav-pinned) .pNavLabel,
+    body.module-open:not(.nav-pinned) .pBrandWord{transition:opacity .14s var(--ease-precise),max-width .18s var(--ease-precise)}
+  }
+}
+
 /* Top-bar priority compaction (Gate 6): 1 nav access, 2 BRABUS
    identity, 3 current module, 4 essential user context, 5 secondary
    user metadata -- the LAST priority is the first to compact. */

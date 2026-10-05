@@ -334,6 +334,15 @@
 
       submitting = false;
       setSubmitting(false);
+      // a session that ended (inactivity, 10 h limit, logout) never leaves the previous
+      // password sitting in the reused form
+      if (state === STATES.SESSION_EXPIRED || state === STATES.SIGNED_OUT) {
+        var senha = document.getElementById('loginPassword');
+        if (senha) senha.value = '';
+      }
+      // session ended by the session guard: its own notice (inactivity / 10 h limit)
+      var aviso = state === STATES.SESSION_EXPIRED && typeof window.NX_AUTH_CORE.getAviso === 'function' ? window.NX_AUTH_CORE.getAviso() : null;
+      if (aviso) { renderStatus(aviso, 'info'); return; }
       var message = STATE_MESSAGES[state];
       if (message) renderStatus(message, 'error');
       else renderStatus(null);

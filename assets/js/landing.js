@@ -128,7 +128,7 @@
       // Gate 3: visible so the information architecture reads as
       // complete, but explicitly non-navigable — never implies
       // functionality that does not exist yet.
-      return '<span class="pNavItem pNavItemDeferred" aria-disabled="true">' +
+      return '<span class="pNavItem pNavItemDeferred" aria-disabled="true" title="' + label + ' (em breve)">' +
         '<span class="pNavIcon">' + icon + '</span><span class="pNavLabel">' + label + '</span>' +
         '<span class="pNavSoon">Em breve</span></span>';
     }
@@ -140,7 +140,8 @@
     // boundary remains exclusively server-side (RPCs/RLS), unchanged.
     if (isAuthDenied(m)) return '';
     var active = activeRouteId === id;
-    return '<a href="#/' + id + '" class="pNavItem' + (active ? ' active' : '') + '"' + (active ? ' aria-current="page"' : '') + '>' +
+    // title: tooltip with the module name when the menu is collapsed to icons
+    return '<a href="#/' + id + '" class="pNavItem' + (active ? ' active' : '') + '"' + (active ? ' aria-current="page"' : '') + ' title="' + label + '">' +
       '<span class="pNavIcon">' + icon + '</span><span class="pNavLabel">' + label + '</span></a>';
   }
 
@@ -160,9 +161,64 @@
         '<img class="pBrandLogo" src="assets/images/brabus-logo.png" alt="" aria-hidden="true">' +
         '<span class="pBrandWord">Portal F&amp;I</span>' +
       '</a>' +
-      '<div class="pNavGroups">' + groupsHtml + '</div>';
+      '<div class="pNavGroups">' + groupsHtml + '</div>' +
+      navPinHtml();
     document.getElementById('pGlobalNav').innerHTML = html;
   }
+
+  /* ---------- menu recolhido em ícones dentro dos módulos (>= 1280 px) ----------
+     body.module-open: a module (not the landing) is open → CSS turns the
+     sidebar into a 64 px icon rail that opens OVER the content on hover /
+     focus / click on the rail, and closes on mouse leave or item click.
+     body.nav-pinned: the user's "keep the menu open" preference (localStorage). */
+  var NAV_PIN_KEY = 'nx.menu.fixado';
+  function navPinned() { return document.body.classList.contains('nav-pinned'); }
+  function navPinHtml() {
+    var fixado = navPinned();
+    var rotulo = fixado ? 'Recolher menu nos módulos' : 'Fixar menu aberto';
+    return '<button type="button" class="pNavPin" id="pNavPin" aria-pressed="' + (fixado ? 'true' : 'false') + '" title="' + rotulo + '">' +
+      '<span class="pNavIcon"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden="true" focusable="false">' +
+      '<path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6zM12 14v7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+      '<span class="pNavLabel">' + rotulo + '</span></button>';
+  }
+  function setNavPinned(fixado) {
+    document.body.classList.toggle('nav-pinned', fixado);
+    document.body.classList.remove('nav-rail-aberto');
+    try { localStorage.setItem(NAV_PIN_KEY, fixado ? '1' : '0'); } catch (e) { /* storage blocked: preference lasts this page only */ }
+    var b = document.getElementById('pNavPin');
+    if (b) b.outerHTML = navPinHtml();
+  }
+  function setupNavRail() {
+    try { if (localStorage.getItem(NAV_PIN_KEY) === '1') document.body.classList.add('nav-pinned'); } catch (e) { /* ignore */ }
+    var nav = document.getElementById('pGlobalNav');
+    if (!nav) return;
+    var body = document.body;
+    var emFaixa = function () {
+      return body.classList.contains('module-open') && !navPinned() && window.matchMedia('(min-width: 1280px)').matches;
+    };
+    // delegated: the nav's innerHTML is rebuilt on every route change
+    nav.addEventListener('click', function (e) {
+      var alvo = e.target;
+      if (alvo.closest('#pNavPin')) { setNavPinned(!navPinned()); return; }
+      if (alvo.closest('.pNavItem') || alvo.closest('.pBrand')) {
+        // picked an item: close, and (mouse click) keep hover from reopening it until the
+        // mouse leaves; a keyboard Enter (detail 0) closes by itself once the nav loses focus
+        body.classList.remove('nav-rail-aberto');
+        if (emFaixa() && e.detail > 0) body.classList.add('nav-rail-recolhido');
+        return;
+      }
+      if (emFaixa()) body.classList.toggle('nav-rail-aberto'); // click on the rail itself
+    });
+    nav.addEventListener('mouseleave', function () { body.classList.remove('nav-rail-aberto', 'nav-rail-recolhido'); });
+    // focus left the nav (also fires when a route change rebuilds it): close a click-opened rail
+    nav.addEventListener('focusout', function (e) {
+      if (!nav.contains(e.relatedTarget)) body.classList.remove('nav-rail-aberto');
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && body.classList.contains('nav-rail-aberto')) body.classList.remove('nav-rail-aberto');
+    });
+  }
+  document.addEventListener('DOMContentLoaded', setupNavRail);
 
   function renderTopBar(entry) {
     var bc = document.getElementById('pBreadcrumb');
@@ -468,6 +524,9 @@
       lastRoute = routeId;
 
       document.body.classList.toggle('landing-active', routeId === 'landing');
+      document.body.classList.toggle('module-open', routeId !== 'landing');
+      // a navigation closes the rail; 'nav-rail-recolhido' stays until the mouse leaves it
+      document.body.classList.remove('nav-rail-aberto');
       renderGlobalNav(routeId);
       renderTopBar(entry);
       if (moduleChanged) window.NX_CONTEXT_BEAM.fire();

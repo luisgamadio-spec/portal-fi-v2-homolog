@@ -81,7 +81,26 @@
     return;
   }
 
-  var client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey);
+  // Session per tab (session-guard.js): the session lives in this tab's sessionStorage, and
+  // the storage only answers after the duplicated-tab check — a copied tab never sees the
+  // original tab's refresh token. Without the guard, fall back to the same sessionStorage.
+  var guard = window.NX_SESSION_GUARD || null;
+  var client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey, {
+    auth: {
+      storage: guard ? guard.storage : window.sessionStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
+  if (guard) {
+    guard.pronto.then(function (r) {
+      // A copy only clears its own storage: the inherited session was hidden from the
+      // client, so this signOut has no access token and makes no server call (calling
+      // the server with the copied token would end the ORIGINAL tab's session).
+      if (r && r.copia) client.auth.signOut({ scope: 'local' }).catch(function () {});
+    });
+  }
 
   // usuario_logado_fi()'s real, live RETURNS TABLE shape (confirmed by
   // direct schema inspection, AUTH FOUNDATION Phase 2A Gate 8):
@@ -164,8 +183,10 @@
       });
     },
 
+    // scope 'local': ends only THIS tab's session (the default 'global' would also end
+    // the independent sessions of the user's other tabs).
     signOut: function () {
-      return client.auth.signOut();
+      return client.auth.signOut({ scope: 'local' });
     },
 
     // Needed because the TEXT transport adapter (and now Auth Core's
