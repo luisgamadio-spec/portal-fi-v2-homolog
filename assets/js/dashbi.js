@@ -740,9 +740,9 @@
   }
 
   function planClassificationHtml(A, counts) {
-    return '<h2 style="margin-top:0">Classificação dos Planos</h2>' +
+    return '<h2 style="margin-top:0">Classificação dos Planos <span class="dbMuted dbPlanScope">· Somente Novos</span></h2>' +
       '<div class="dbPlanGrid">' + ['SUBSIDIADO', 'REVERSÃO', 'COPARTICIPADO', 'BALÃO', 'LINEAR'].map(function (t) { return planCardHtml(A, t, counts[t]); }).join('') + '</div>' +
-      '<p class="dbMuted">Classificação oficial por operação, mesma prioridade de Análise F&I do Grupo e Coparticipado: Código IF 999 ou SUBSIDIADO; Código IF 777 ou REVERSÃO; TC Devolvida 1 ou COPARTICIPADO; Balão PMT maior que zero; demais = LINEAR. Faz parte da Análise por Modelos em produção (mesma seção/aba real), não uma visão geral separada.</p>';
+      '<p class="dbMuted">Somente Novos: conta apenas as operações de financiamento de Novos no período e na loja selecionados (Seminovos não entram), por isso a soma bate com Financiamentos da visão Novos. Classificação oficial por operação, mesma prioridade de Análise F&I do Grupo e Coparticipado: Código IF 999 ou SUBSIDIADO; Código IF 777 ou REVERSÃO; TC Devolvida 1 ou COPARTICIPADO; Balão PMT maior que zero; demais = LINEAR.</p>';
   }
 
   // FC-1 (GAP-001): factored out of modelAnalysisHtml so the SAME
@@ -1079,8 +1079,13 @@
       closed = A.isClosedMonthPeriod({ min: new Date(currentDateStart + 'T00:00:00'), max: new Date(currentDateEnd + 'T00:00:00') });
     }
 
+    // Classificação dos Planos counts ONLY Novos operations, whatever the Visão button
+    // (out.fins carries both departments; period and store are already applied to out).
+    // Previously it counted every department, so its total equaled the Grupo's
+    // Financiamentos (Novos + Seminovos) instead of the Novos one.
     var counts = { LINEAR: 0, 'BALÃO': 0, COPARTICIPADO: 0, SUBSIDIADO: 0, 'REVERSÃO': 0 };
     (out.fins || []).forEach(function (f) {
+      if (f.dept !== 'Novos') return;
       var k = A.planoKeyOperacao(f);
       counts[k] = (counts[k] || 0) + 1;
     });
