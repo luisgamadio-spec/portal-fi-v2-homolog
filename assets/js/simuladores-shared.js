@@ -48,7 +48,7 @@
     var cleanValue = String(value || '').replace(/^R\$\s*/, '');
     return '<div class="field"><label for="' + id + '">' + esc(label) + '</label>' +
       '<div class="inputAffix"><span class="prefix">R$</span>' +
-      '<input class="input mono" id="' + id + '" inputmode="decimal" value="' + esc(cleanValue) + '"></div>' +
+      '<input class="input mono" id="' + id + '" inputmode="decimal" autocomplete="off" data-money value="' + esc(cleanValue) + '"></div>' +
       (hint ? '<span class="hint">' + esc(hint) + '</span>' : '') + '</div>';
   }
   function numberField(id, label, value, opts) {
@@ -65,7 +65,7 @@
     // type="number", which silently rejects comma decimals (requires a
     // dot regardless of locale) and would blank the field on render.
     return '<div class="field"><label for="' + id + '">' + esc(label) + '</label>' +
-      '<input class="input mono" id="' + id + '" type="text" inputmode="decimal" value="' + esc(value || '') + '">' +
+      '<input class="input mono" id="' + id + '" type="text" inputmode="decimal" autocomplete="off" data-percent value="' + esc(value || '') + '">' +
       (hint ? '<span class="hint">' + esc(hint) + '</span>' : '') + '</div>';
   }
   function dateField(id, label, value) {
@@ -108,6 +108,78 @@
     if (!el) return;
     el.addEventListener('blur', function () { el.value = brlDigits(S.parseBRL(el.value)); if (onInput) onInput(); });
     el.addEventListener('input', function () { if (onInput) onInput(); });
+  }
+
+  /* ---------- live formatting while typing ----------
+     Every input[data-money] (the "R$" prefix is a separate span) shows
+     "150.000" while typing and "150.000,00" after leaving the field;
+     input[data-percent] keeps a decimal comma. The value read by the
+     engines is still parseBRL(el.value) / Number(text with ',' -> '.'),
+     and the formatted text parses to the same number as what was typed
+     (digits, first comma, up to 2 decimals for money). Runs in the
+     CAPTURE phase so each page's own 'input' listener already sees the
+     formatted text. Caret stays after the same digit; Backspace/Delete
+     next to a thousands dot remove the digit beside it. */
+  function formatMoneyTyping(raw) {
+    var s = String(raw);
+    var neg = /^\s*(R\$\s*)?-/.test(s);
+    var limpo = s.replace(/[^\d,]/g, '');
+    var virg = limpo.indexOf(',');
+    var inteiro = virg === -1 ? limpo : limpo.slice(0, virg);
+    var dec = virg === -1 ? null : limpo.slice(virg + 1).replace(/,/g, '').slice(0, 2);
+    inteiro = inteiro.replace(/^0+(?=\d)/, '');
+    if (inteiro === '' && dec !== null) inteiro = '0';
+    var grupos = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    var out = grupos + (dec !== null ? ',' + dec : '');
+    return out && neg ? '-' + out : out;
+  }
+  function formatPercentTyping(raw) {
+    var limpo = String(raw).replace(/\./g, ',').replace(/[^\d,]/g, '');
+    var virg = limpo.indexOf(',');
+    return virg === -1 ? limpo : limpo.slice(0, virg + 1) + limpo.slice(virg + 1).replace(/,/g, '');
+  }
+  // significant characters (digits and the decimal comma) before position pos;
+  // in a percent field a typed '.' is the decimal separator (becomes ',')
+  function contaSignif(s, pos, ponto) { return (String(s).slice(0, pos).match(ponto ? /[\d,.]/g : /[\d,]/g) || []).length; }
+  function posDoSignif(s, n) {
+    if (n <= 0) return 0;
+    var c = 0;
+    for (var i = 0; i < s.length; i++) { if (/[\d,]/.test(s[i]) && ++c === n) return i + 1; }
+    return s.length;
+  }
+  function reformata(el, fmt) {
+    var antes = el.value;
+    var depois = fmt(antes);
+    if (depois === antes) return;
+    var focado = document.activeElement === el;
+    var n = focado ? contaSignif(antes, el.selectionStart || 0, fmt === formatPercentTyping) : 0;
+    el.value = depois;
+    if (focado) { var p = posDoSignif(depois, n); try { el.setSelectionRange(p, p); } catch (e) { /* type sem seleção */ } }
+  }
+  function alvoMascara(t) {
+    if (!t || t.tagName !== 'INPUT') return null;
+    if (t.hasAttribute('data-money')) return formatMoneyTyping;
+    if (t.hasAttribute('data-percent')) return formatPercentTyping;
+    return null;
+  }
+  if (!window.__nxSimMascara) {
+    window.__nxSimMascara = true;
+    document.addEventListener('input', function (ev) {
+      var fmt = alvoMascara(ev.target);
+      if (fmt) reformata(ev.target, fmt);
+    }, true);
+    document.addEventListener('keydown', function (ev) {
+      var el = ev.target;
+      if (!alvoMascara(el) || !el.hasAttribute('data-money') || el.selectionStart !== el.selectionEnd) return;
+      var p = el.selectionStart;
+      if (ev.key === 'Backspace' && p > 0 && el.value[p - 1] === '.') el.setSelectionRange(p - 1, p - 1);
+      if (ev.key === 'Delete' && el.value[p] === '.') el.setSelectionRange(p + 1, p + 1);
+    }, true);
+    document.addEventListener('blur', function (ev) {
+      var el = ev.target;
+      if (!el || el.tagName !== 'INPUT' || !el.hasAttribute('data-money') || el.value.trim() === '') return;
+      el.value = brlDigits(S.parseBRL(el.value));
+    }, true);
   }
 
   function moneyVal(id) { var el = document.getElementById(id); return el ? S.parseBRL(el.value) : 0; }
@@ -208,6 +280,7 @@
     moneyField: moneyField, numberField: numberField, percentField: percentField, dateField: dateField,
     segmentedField: segmentedField, selectField: selectField,
     getSegmentedValue: getSegmentedValue, wireSegmented: wireSegmented, wireMoneyMask: wireMoneyMask,
+    formatMoneyTyping: formatMoneyTyping, formatPercentTyping: formatPercentTyping,
     moneyVal: moneyVal, numVal: numVal, textVal: textVal,
     resultHero: resultHero, secondaryGrid: secondaryGrid, termGrid: termGrid,
     errorBlock: errorBlock, emptyBlock: emptyBlock, warningBlock: warningBlock,

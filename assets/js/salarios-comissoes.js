@@ -123,6 +123,12 @@
   var periods = null;
   var periodsState = 'LOADING'; // LOADING | READY | ERROR
   var selectedPeriodId = null;
+  // Período personalizado: um "período" só desta tela (datas livres), servido pelas MESMAS RPCs e o
+  // MESMO escopo de acesso dos períodos pré-definidos -- selectedPeriod() devolve {data_inicio,
+  // data_fim} e todo o resto da tela segue igual. Nada é gravado; não substitui o fechamento.
+  var CUSTOM_ID = '__personalizado__';
+  var customRange = null;   // { data_inicio, data_fim } aplicado
+  var customError = '';
 
   var dashboard = null; // {metrics, metricsError, analystMetrics, analystMetricsError, managerDirectory, managerDirectoryError}
   var dashboardState = 'LOADING'; // LOADING | READY | ERROR (ERROR only if the whole call rejected, e.g. invalid period)
@@ -282,7 +288,42 @@
   }
 
   function selectedPeriod() {
+    if (selectedPeriodId === CUSTOM_ID) {
+      return customRange ? { id: CUSTOM_ID, nome_periodo: 'Período personalizado', data_inicio: customRange.data_inicio, data_fim: customRange.data_fim, personalizado: true } : null;
+    }
     return (periods || []).filter(function (p) { return p.id === selectedPeriodId; })[0] || null;
+  }
+
+  // ---------- período personalizado: datas e validação ----------
+  function hojeIso() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function isoValida(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !isNaN(Date.parse(s + 'T00:00:00Z')); }
+  // último dia permitido para o fim: início + 1 ano - 1 dia (ex.: 01/03/2026 → 28/02/2027)
+  function limiteUmAno(ini) {
+    var d = new Date(ini + 'T00:00:00Z');
+    d.setUTCFullYear(d.getUTCFullYear() + 1); d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+  function validarPeriodo(ini, fim) {
+    if (!isoValida(ini) || !isoValida(fim)) return 'Informe a data inicial e a data final.';
+    if (ini > fim) return 'A data inicial precisa ser igual ou anterior à data final.';
+    if (fim > hojeIso() || ini > hojeIso()) return 'O período não pode ter datas depois de hoje.';
+    if (fim > limiteUmAno(ini)) return 'O período pode ter no máximo 1 ano.';
+    return '';
+  }
+  function aplicarPersonalizado(ini, fim) {
+    customError = validarPeriodo(ini, fim);
+    if (customError) { render(outletRef); return false; }
+    customRange = { data_inicio: ini, data_fim: fim };
+    selectedPeriodId = CUSTOM_ID;
+    loadDashboard();
+    return true;
+  }
+  // Competência com exatamente as mesmas datas (o período escolhido coincide com uma competência).
+  function competenciaIgual(r) {
+    return (periods || []).filter(function (p) { return p.data_inicio === r.data_inicio && p.data_fim === r.data_fim; })[0] || null;
   }
 
   // Fetched once at mount, never re-fetched on period change -- these
@@ -486,6 +527,16 @@
 
   function onPeriodChange(newId) {
     if (newId === selectedPeriodId) return;
+    if (newId === CUSTOM_ID) {
+      // Começa com as datas do período que estava selecionado (fim limitado a hoje); o usuário ajusta e aplica.
+      var base = selectedPeriod() || {};
+      var hoje = hojeIso();
+      var ini = customRange ? customRange.data_inicio : (base.data_inicio && base.data_inicio <= hoje ? base.data_inicio : hoje);
+      var fim = customRange ? customRange.data_fim : (base.data_fim && base.data_fim < hoje ? base.data_fim : hoje);
+      aplicarPersonalizado(ini, fim);
+      return;
+    }
+    customError = '';
     selectedPeriodId = newId;
     loadDashboard();
   }
@@ -715,8 +766,37 @@
       return '<option value="' + esc(p.id) + '"' + (p.id === selectedPeriodId ? ' selected' : '') + '>' +
         esc(p.nome_periodo || (fmtDateBR(p.data_inicio) + ' a ' + fmtDateBR(p.data_fim))) +
         (p.periodo_atual ? ' (atual)' : '') + '</option>';
-    }).join('');
-    return '<div class="modFilters"><label class="modField">Período<select id="salPeriodSelect">' + options + '</select></label></div>';
+    }).join('') + '<option value="' + CUSTOM_ID + '"' + (selectedPeriodId === CUSTOM_ID ? ' selected' : '') + '>Período personalizado</option>';
+    var html = '<div class="modFilters"><label class="modField">Período<select id="salPeriodSelect">' + options + '</select></label>';
+    if (selectedPeriodId === CUSTOM_ID) {
+      var r = customRange || {};
+      var hoje = hojeIso();
+      html += '<div class="modField"><label for="salCustomStart">Data inicial</label><input id="salCustomStart" type="date" max="' + hoje + '" value="' + esc(r.data_inicio || '') + '"></div>' +
+        '<div class="modField"><label for="salCustomEnd">Data final</label><input id="salCustomEnd" type="date" max="' + hoje + '" value="' + esc(r.data_fim || '') + '"></div>' +
+        '<div class="modField"><label>&nbsp;</label><button type="button" class="modBtn modBtnSecondary" id="salCustomApply">Aplicar</button></div>';
+    }
+    html += '</div>';
+    if (selectedPeriodId === CUSTOM_ID) html += customPeriodNoteHtml();
+    return html;
+  }
+
+  // Aviso do período personalizado. Comportamento real das faixas (_operational_commission_faixa_formula):
+  // tudo é calculado sobre o período inteiro, sem proporcionalidade -- o share é uma razão (não depende da
+  // duração) e o limite de rentabilidade do vendedor é um valor fixo em R$ por período.
+  function customPeriodNoteHtml() {
+    var r = customRange;
+    var c = commissionConfig || {};
+    var partes = '<p id="salCustomNote" class="salCustomNote"><b>Valores calculados pelo Portal para o período escolhido. O valor oficial é o do fechamento da competência.</b></p>';
+    if (customError) partes = '<p id="salCustomError" class="salCustomError" role="alert">' + esc(customError) + '</p>' + partes;
+    if (r && !competenciaIgual(r)) {
+      var lim = (c.limite_retorno_novos != null && c.limite_retorno_seminovos != null)
+        ? ' (hoje ' + moneyInt(c.limite_retorno_novos) + ' em Novos e ' + moneyInt(c.limite_retorno_seminovos) + ' em Seminovos)' : '';
+      partes += '<p id="salCustomFaixaNote" class="salCustomNote">Este período não coincide com uma competência. As faixas são aplicadas ao período inteiro, sem proporcionalidade: ' +
+        'o share (financiadas ÷ vendidas) não depende da duração, mas o limite de rentabilidade do vendedor' + esc(lim) + ' é um valor fixo — ' +
+        'num período mais curto que uma competência fica mais difícil atingir a faixa alta, e num mais longo, mais fácil. Gerente e analista dependem só do share. ' +
+        'Este cálculo não substitui o fechamento.</p>';
+    }
+    return '<div class="salCustomNotes">' + partes + '</div>';
   }
 
   // Only ever 2 options, and only rendered at all for MASTER (the sole
@@ -1810,6 +1890,10 @@
     if (dashRetry) dashRetry.addEventListener('click', loadDashboard);
     var periodSelect = document.getElementById('salPeriodSelect');
     if (periodSelect) periodSelect.addEventListener('change', function () { onPeriodChange(periodSelect.value); });
+    var customApply = document.getElementById('salCustomApply');
+    if (customApply) customApply.addEventListener('click', function () {
+      aplicarPersonalizado(document.getElementById('salCustomStart').value, document.getElementById('salCustomEnd').value);
+    });
     document.querySelectorAll('[data-details]').forEach(function (btn) {
       btn.addEventListener('click', function () { openDetails(btn.getAttribute('data-details'), btn.getAttribute('data-name')); });
     });
@@ -1865,6 +1949,8 @@
     getPeriodsState: function () { return periodsState; },
     getDashboardState: function () { return dashboardState; },
     getSelectedPeriodId: function () { return selectedPeriodId; },
+    getSelectedPeriod: function () { return selectedPeriod(); },
+    getCustomError: function () { return customError; },
     getHistoryClosingsState: function () { return historyClosingsState; },
     getSelectedClosingId: function () { return selectedClosingId; },
     getHistoryDetailState: function () { return historyDetail ? historyDetail.state : null; },
@@ -1881,6 +1967,7 @@
         ? window.NX_ROUTER.currentRouteId() : null;
       viewMode = 'atual';
       periods = null; periodsState = 'LOADING'; selectedPeriodId = null;
+      customRange = null; customError = '';
       dashboard = null; dashboardState = 'LOADING';
       commissionConfig = null; commissionConfigState = 'LOADING';
       gestorFi = null; gestorFiState = 'IDLE'; gestorFiError = null;

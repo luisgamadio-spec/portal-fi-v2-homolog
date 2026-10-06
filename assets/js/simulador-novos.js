@@ -784,7 +784,7 @@
     list.innerHTML = balloons.map(function (b, i) {
       return '<div class="smBalloonRow">' +
         '<div class="field"><label>Mês do balão ' + (i + 1) + '</label><input class="input mono" type="number" min="1" data-bidx="' + i + '" data-bfield="mes" value="' + (b.mes || '') + '"></div>' +
-        '<div class="field"><label>Valor do balão ' + (i + 1) + '</label><div class="inputAffix"><span class="prefix">R$</span><input class="input mono" data-bidx="' + i + '" data-bfield="valor" value="' + (b.valorText || '') + '"></div></div>' +
+        '<div class="field"><label>Valor do balão ' + (i + 1) + '</label><div class="inputAffix"><span class="prefix">R$</span><input class="input mono" inputmode="decimal" autocomplete="off" data-money data-bidx="' + i + '" data-bfield="valor" value="' + (b.valorText || '') + '"></div></div>' +
         '<button type="button" class="btn btn-tertiary btn-sm" data-bremove="' + i + '" aria-label="Remover balão ' + (i + 1) + '">Remover</button>' +
         '</div>';
     }).join('');
@@ -841,7 +841,7 @@
     list.innerHTML = antBaloes.map(function (b, idx) {
       return '<div class="smBalloonRow">' +
         '<div class="field"><label>Mês/parcela do balão ' + (idx + 1) + '</label><input class="input mono" type="number" min="1" max="60" data-abidx="' + idx + '" data-abfield="mes" value=""></div>' +
-        '<div class="field"><label>Valor do balão ' + (idx + 1) + '</label><div class="inputAffix"><span class="prefix">R$</span><input class="input mono" data-abidx="' + idx + '" data-abfield="valor" value=""></div></div>' +
+        '<div class="field"><label>Valor do balão ' + (idx + 1) + '</label><div class="inputAffix"><span class="prefix">R$</span><input class="input mono" inputmode="decimal" autocomplete="off" data-money data-abidx="' + idx + '" data-abfield="valor" value=""></div></div>' +
         '</div>';
     }).join('');
     list.querySelectorAll('[data-abidx]').forEach(function (el) {
