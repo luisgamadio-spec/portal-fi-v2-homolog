@@ -295,7 +295,7 @@
       '<div class="fNavCol">' +
         '<div class="fNavEyebrow">Categorias</div>' +
         '<nav class="fNav" id="landingNav" role="tablist" aria-label="Categorias do Portal">' + navItems + '</nav>' +
-        analystCtaHtml('portal_home') +
+        (podeVerSimulador() ? analystCtaHtml('portal_home') : '') +
       '</div>' +
       '<section class="fCanvas"><div class="ambientLayer" id="landingAmbientLayer" aria-hidden="true"></div><div class="motionProtectFull"></div><div class="fCanvasInner">' +
       '<div class="fDetailEyebrow" id="landingDetailEyebrow"></div>' +
@@ -314,6 +314,15 @@
   // (fi-atendimento.js) -- this only renders the button and a short
   // hint; origin is carried both as a data attribute (inspectable in
   // the DOM) and passed straight through to the shared handler.
+  // The CTA is help with a simulation: only for users who can open a simulator
+  // (e.g. RH, limited to Salários & Comissões, never sees it).
+  function podeVerSimulador() {
+    return ['simulador-novos', 'simulador-seminovos'].some(function (id) {
+      var m = window.NX_REGISTRY && window.NX_REGISTRY.byId(id);
+      return !!m && !isAuthDenied(m);
+    });
+  }
+
   function analystCtaHtml(origin) {
     return '<div class="fAnalystCta">' +
       '<p class="fAnalystCtaHint">Precisa de ajuda com uma simulação?</p>' +
@@ -562,4 +571,13 @@
       return Promise.resolve(null);
     }
   };
+
+  // The IA's access is confirmed by its server a moment after login: redraw the menu (and the
+  // landing categories, when on it) so the IA appears without waiting for the next navigation.
+  window.addEventListener('nx:acesso-ia', function () {
+    var AC = window.NX_AUTH_CORE;
+    if (!AC || AC.getState() !== AC.STATES.AUTHORIZED || !window.NX_ROUTER) return;
+    var rota = window.NX_ROUTER.currentRouteId();
+    window.NX_LANDING.renderRoute(rota, window.NX_REGISTRY && window.NX_REGISTRY.byId(rota));
+  });
 })();

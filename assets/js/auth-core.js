@@ -246,7 +246,12 @@
         case 'LOGIN_REQUIRED': return true;
         case 'MASTER_ONLY': return context.isMaster === true;
         case 'ANALISTA_OR_MASTER': return context.isMaster === true || context.perfil === 'ANALISTA';
-        case 'SEPARATE_AUTHORITY': return true;
+        // The module's own server decides (e.g. the IA function's BI_PERFIS):
+        // the module registers a check in NX_SEPARATE_AUTHORITY[id]; none
+        // registered, or not yet confirmed by the server, means denied.
+        case 'SEPARATE_AUTHORITY':
+          var separada = window.NX_SEPARATE_AUTHORITY && window.NX_SEPARATE_AUTHORITY[entry.id];
+          return typeof separada === 'function' && separada(context) === true;
         case 'PERMISSION_MATRIX':
           if (!entry.permissionId) return false;
           return context.allowedModuleIds.indexOf(entry.permissionId) !== -1;

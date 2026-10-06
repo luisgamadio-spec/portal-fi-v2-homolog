@@ -45,6 +45,29 @@
     return authorized;
   }
 
+  // Liberação por perfil é regra do servidor (BI_PERFIS na função): a IA (painel, categoria da
+  // tela inicial, menu) só aparece depois que a função confirma este login ({ verificar_acesso:
+  // true }, sem chamar o modelo). Uma vez por usuário; 403, falha de rede ou função fora do ar
+  // deixam a IA fechada. Registrada como a autoridade separada do módulo (auth-core.js).
+  var acesso = { chave: null, liberado: false };
+  function liberadoPeloServidor(ctx) {
+    var chave = ctx ? String(ctx.authUserId || ctx.userId || '') : '';
+    if (!chave) return false;
+    if (acesso.chave !== chave) {
+      acesso = { chave: chave, liberado: false };
+      chamarBi({ verificar_acesso: true }).then(function (r) {
+        if (acesso.chave !== chave) return;
+        acesso.liberado = r.status === 200 && r.j.liberado === true;
+        if (!acesso.liberado) return;
+        refreshVisibility();
+        try { window.dispatchEvent(new CustomEvent('nx:acesso-ia')); } catch (e) { /* sem CustomEvent: a tela inicial atualiza na próxima navegação */ }
+      }, function () {});
+    }
+    return acesso.liberado;
+  }
+  window.NX_SEPARATE_AUTHORITY = window.NX_SEPARATE_AUTHORITY || {};
+  window.NX_SEPARATE_AUTHORITY['brabus-intelligence'] = liberadoPeloServidor;
+
   /* ============================================================
      CHAT — transport (POST {supabaseUrl}/functions/v1/brabus-intelligence)
      ============================================================ */
