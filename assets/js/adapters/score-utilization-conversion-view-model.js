@@ -88,7 +88,9 @@
   // Janelas sem dados de telemetria (datas inclusivas, AAAA-MM-DD, America/Sao_Paulo).
   // end: null = ainda aberta (até a publicação da telemetria em produção) --
   // preencher com a data da publicação quando ela acontecer.
-  var TELEMETRY_GAPS = [{ start: '2026-10-07', end: null, motivo: 'V2 em produção sem telemetria dos simuladores' }];
+  // Fechada em 07/10/2026: telemetria do V2 publicada em produção nesse dia (piloto, à noite);
+  // a partir de 08/10 a utilização volta a contar normalmente.
+  var TELEMETRY_GAPS = [{ start: '2026-10-07', end: '2026-10-07', motivo: 'V2 em produção sem telemetria dos simuladores' }];
 
   function isoAddDays(iso, n) {
     var d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n);
