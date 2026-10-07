@@ -696,8 +696,6 @@
     // authority now reconciled via live pg_get_functiondef).
     { id: 'fechamentoCompetencia', label: 'Fechamento de Competência', active: true },
     { id: 'historicoCompetencias', label: 'Histórico de Competências', active: true },
-    // Paridade com o v1 (07/10/2026): seção autocontida em master-revisoes-section.js.
-    { id: 'revisoesCadastrais', label: 'Revisões Cadastrais', active: true },
     { id: 'pendenciasCadastrais', label: 'Pendências Cadastrais', active: true },
     { id: 'auditoria', label: 'Auditoria', active: true }
   ];
@@ -733,7 +731,6 @@
   }
 
   function switchSection(targetId) {
-    if (window.NX_MASTER_REVISOES_SECTION) window.NX_MASTER_REVISOES_SECTION.leave();
     currentSection = targetId;
     currentDetailId = null;
     editForm = null;
@@ -775,9 +772,6 @@
       acessosEnter();
     } else if (currentSection === 'auditoria') {
       auditEnter();
-    } else if (currentSection === 'revisoesCadastrais') {
-      renderPanel();
-      if (window.NX_MASTER_REVISOES_SECTION) window.NX_MASTER_REVISOES_SECTION.enter(document.getElementById('maPanel'));
     } else if (currentSection === 'pendenciasCadastrais') {
       pcEnter();
     } else if (currentSection === 'gestaoBases') {
@@ -5109,13 +5103,6 @@
         htmlA += confirmHtml(pendingConfirm.title, pendingConfirm.body, pendingConfirm.confirmLabel, pendingConfirm.destructive, pendingConfirm.bodyHtml);
       }
       panel.innerHTML = htmlA;
-      wireInteraction();
-      return;
-    }
-
-    if (currentSection === 'revisoesCadastrais') {
-      if (window.NX_MASTER_REVISOES_SECTION) window.NX_MASTER_REVISOES_SECTION.render(panel);
-      else panel.innerHTML = errorStateHtml('RPC_ERROR');
       wireInteraction();
       return;
     }
