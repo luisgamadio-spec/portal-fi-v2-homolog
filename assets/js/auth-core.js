@@ -173,7 +173,14 @@
       aviso = null;
       return window.NX_AUTH.signIn(email, password, captchaToken).then(function () {
         if (guard()) guard().iniciarSessao(); // the 10 h limit counts from this login
-        return resolveAfterSession();
+        return resolveAfterSession().then(function () {
+          // Paridade com o v1: só depois de um login interativo autorizado
+          // (nunca no boot/restauração de sessão). Fire-and-forget: uma falha
+          // aqui nunca impede a entrada no Portal.
+          if (state === STATES.AUTHORIZED && typeof window.NX_AUTH.registerLogin === 'function') {
+            try { window.NX_AUTH.registerLogin().catch(function () { /* best-effort */ }); } catch (e) { /* best-effort */ }
+          }
+        });
       }).catch(function (err) {
         context = null;
         var msg = String((err && err.message) || err || '');

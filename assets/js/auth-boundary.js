@@ -183,6 +183,18 @@
       });
     },
 
+    // Paridade com o v1 (auditoria de 07/10/2026): registrar_meu_login grava
+    // usuarios.ultimo_login e zera tentativas_login para o próprio usuário
+    // (auth.uid()), logo após um login interativo -- o v1 faz o mesmo em
+    // syncSupabaseUsuario. A linha devolvida pela RPC é descartada aqui:
+    // nada dela é lido nem guardado no navegador.
+    registerLogin: function () {
+      return client.rpc('registrar_meu_login').then(function (result) {
+        if (result.error) throw result.error;
+        return true;
+      });
+    },
+
     // scope 'local': ends only THIS tab's session (the default 'global' would also end
     // the independent sessions of the user's other tabs).
     signOut: function () {
