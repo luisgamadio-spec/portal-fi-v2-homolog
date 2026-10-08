@@ -220,6 +220,15 @@
   function getAuthContext() {
     return (window.NX_AUTH_CORE && typeof window.NX_AUTH_CORE.getContext === 'function') ? window.NX_AUTH_CORE.getContext() : null;
   }
+  // Retorno/Rentabilidade: só para os perfis que o servidor autoriza a receber esses campos
+  // (_operational_ocultar_retorno_vendedor: MASTER, DIRETOR, GERENTE, ANALISTA). Para os demais
+  // (vendedor, RH) o servidor já não manda o dado; aqui só some a coluna/cartão vazio.
+  function veRetorno() {
+    var c = getAuthContext();
+    var p = String((c && c.perfil) || '').trim().toUpperCase();
+    return !!c && (c.isMaster === true || p === 'MASTER' || p.indexOf('DIRETOR') === 0 || p === 'GERENTE' || p === 'ANALISTA');
+  }
+  function soRetorno(html) { return veRetorno() ? html : ''; }
   // Presentation-only helpers (see file header) -- mirror V1's own
   // podeVerAnalista/podeVerGerente exactly, never a new rule.
   function canSeeAnalistas(ctx) {
@@ -1040,10 +1049,10 @@
       kpiCard('Financiadas', fmtInt(t.financed_count)) +
       kpiCard('Conversão', fmtPct(t.share_percent), conversionKpiClass(t.share_percent)) +
       kpiCard('Produção', fmtMoney(t.production_value)) +
-      kpiCard('Retorno', fmtMoney(t.return_value)) +
+      soRetorno(kpiCard('Retorno', fmtMoney(t.return_value))) +
       kpiCard('SPF Extra', fmtMoney(t.spf_value)) +
       kpiCard('SPF Líquido', fmtMoney(t.spf_net_value)) +
-      kpiCard('Rentabilidade', fmtMoney(t.profitability_value), 'modKpiCardSuccess') +
+      soRetorno(kpiCard('Rentabilidade', fmtMoney(t.profitability_value), 'modKpiCardSuccess')) +
       '</div>' +
       (dashboard.analystMetricsError || dashboard.managerDirectoryError ? partialFailureNoteHtml() : '')
     );
@@ -1293,9 +1302,9 @@
       '<td class="modNumCol">' + fmtInt(r.financed_count) + '</td>' +
       '<td class="modNumCol">' + conversionCellHtml(r.share_percent) + '</td>' +
       '<td class="modNumCol modCurrencyCol">' + fmtMoney(r.production_value) + '</td>' +
-      '<td class="modNumCol modCurrencyCol">' + fmtMoney(r.return_value) + '</td>' +
+      soRetorno('<td class="modNumCol modCurrencyCol">' + fmtMoney(r.return_value) + '</td>') +
       '<td class="modNumCol modCurrencyCol">' + fmtMoney(r.spf_net_value) + '</td>' +
-      '<td class="modNumCol modCurrencyCol">' + fmtMoney(r.profitability_value) + '</td>' +
+      soRetorno('<td class="modNumCol modCurrencyCol">' + fmtMoney(r.profitability_value) + '</td>') +
       '<td class="modNumCol">' + faixaCellHtml(faixaMatch) + '</td>' +
       '<td class="modNumCol modCurrencyCol">' + comissaoTotalCellHtml(faixaMatch) + '</td>' +
       (r.seller_id ? '<td class="modActionCol"><button type="button" class="modBtn modBtnGhost modBtnSm" data-details="' + esc(r.seller_id) + '" data-name="' + esc(r.seller_name || '') + '">Detalhes</button></td>' : '<td></td>') +
@@ -1309,9 +1318,9 @@
       '<td class="modNumCol">' + fmtInt(t.financed_count) + '</td>' +
       '<td class="modNumCol">' + conversionCellHtml(trailing.shareValue) + '</td>' +
       '<td class="modNumCol modCurrencyCol">' + fmtMoney(t.production_value) + '</td>' +
-      '<td class="modNumCol modCurrencyCol">' + fmtMoney(t.return_value) + '</td>' +
+      soRetorno('<td class="modNumCol modCurrencyCol">' + fmtMoney(t.return_value) + '</td>') +
       '<td class="modNumCol modCurrencyCol">' + fmtMoney(t.spf_net_value) + '</td>' +
-      '<td class="modNumCol modCurrencyCol">' + fmtMoney(t.profitability_value) + '</td>' +
+      soRetorno('<td class="modNumCol modCurrencyCol">' + fmtMoney(t.profitability_value) + '</td>') +
       '<td class="modNumCol">' + faixaCellHtml(trailing.faixaMatch) + '</td>' +
       '<td class="modNumCol modCurrencyCol">' + comissaoTotalCellHtml(trailing.faixaMatch) + '</td><td></td></tr>';
   }
@@ -1322,9 +1331,9 @@
       '<dl class="salCardFields">' +
       '<dt>Vendidas / Financiadas</dt><dd>' + fmtInt(r.sold_count) + ' / ' + fmtInt(r.financed_count) + '</dd>' +
       '<dt>Produção</dt><dd>' + fmtMoney(r.production_value) + '</dd>' +
-      '<dt>Retorno</dt><dd>' + fmtMoney(r.return_value) + '</dd>' +
+      soRetorno('<dt>Retorno</dt><dd>' + fmtMoney(r.return_value) + '</dd>') +
       '<dt>SPF Líquido</dt><dd>' + fmtMoney(r.spf_net_value) + '</dd>' +
-      '<dt>Rentabilidade</dt><dd>' + fmtMoney(r.profitability_value) + '</dd>' +
+      soRetorno('<dt>Rentabilidade</dt><dd>' + fmtMoney(r.profitability_value) + '</dd>') +
       '<dt>% Comissão</dt><dd>' + faixaCellHtml(faixaMatch) + '</dd>' +
       '<dt>Comissão Total</dt><dd class="salCommissionTotalValue">' + comissaoTotalCellHtml(faixaMatch) + '</dd>' +
       '</dl>' +
@@ -1339,9 +1348,9 @@
       '<dl class="salCardFields">' +
       '<dt>Vendidas / Financiadas</dt><dd>' + fmtInt(t.sold_count) + ' / ' + fmtInt(t.financed_count) + '</dd>' +
       '<dt>Produção</dt><dd>' + fmtMoney(t.production_value) + '</dd>' +
-      '<dt>Retorno</dt><dd>' + fmtMoney(t.return_value) + '</dd>' +
+      soRetorno('<dt>Retorno</dt><dd>' + fmtMoney(t.return_value) + '</dd>') +
       '<dt>SPF Líquido</dt><dd>' + fmtMoney(t.spf_net_value) + '</dd>' +
-      '<dt>Rentabilidade</dt><dd>' + fmtMoney(t.profitability_value) + '</dd>' +
+      soRetorno('<dt>Rentabilidade</dt><dd>' + fmtMoney(t.profitability_value) + '</dd>') +
       '<dt>% Comissão</dt><dd>' + faixaCellHtml(trailing.faixaMatch) + '</dd>' +
       '<dt>Comissão Total</dt><dd class="salCommissionTotalValue">' + comissaoTotalCellHtml(trailing.faixaMatch) + '</dd>' +
       '</dl></div>';
@@ -1505,13 +1514,13 @@
         // now-authoritative Comissão Total column -- colspan raised from
         // 10 to 11 accordingly (RH-5B.3's own established fix for this
         // exact "linha cortada, sem continuidade" defect class).
-        var header = '<tr class="salGroupHeaderRow"><th colspan="11">' + esc(g.store || '—') + ' · ' + esc(g.department || '—') + '</th></tr>';
+        var header = '<tr class="salGroupHeaderRow"><th colspan="' + (veRetorno() ? 11 : 9) + '">' + esc(g.store || '—') + ' · ' + esc(g.department || '—') + '</th></tr>';
         var rowsHtml = g.rows.map(sellerRowDesktopHtml).join('');
         var trailing = trailingRowDesktopHtml(trailingGroupRow(ctx, g, directory));
         return header + rowsHtml + trailing;
       }).join('');
       var table = '<div class="modTableWrap salDesktopOnly salEquipeTableWrap"><table class="modTable"><thead><tr>' +
-        '<th>Vendedor</th><th>Vendidas</th><th>Financiadas</th><th>Conversão</th><th>Produção</th><th>Retorno</th><th>SPF Líq.</th><th>Rentabilidade</th><th>% Comissão</th><th>Comissão Total</th><th>Ações</th>' +
+        '<th>Vendedor</th><th>Vendidas</th><th>Financiadas</th><th>Conversão</th><th>Produção</th>' + soRetorno('<th>Retorno</th>') + '<th>SPF Líq.</th>' + soRetorno('<th>Rentabilidade</th>') + '<th>% Comissão</th><th>Comissão Total</th><th>Ações</th>' +
         '</tr></thead><tbody>' + body + '</tbody></table></div>';
       consumedStores[sg.store || ''] = true;
       return '<div class="salStoreGroup">' + table + (showAnalysts ? analystRowsDesktopTableHtml(analystByStore[sg.store || '']) : '') + '</div>';
@@ -1798,9 +1807,9 @@
       '</div>' +
       '<div class="salOpRowFinancial">' +
       '<div class="salOpMetric"><span class="salOpMetricLabel">Valor financiado</span><span class="salOpMetricValue">' + fmtMoney(r.financed_value) + '</span></div>' +
-      '<div class="salOpMetric"><span class="salOpMetricLabel">Retorno</span><span class="salOpMetricValue">' + fmtMoney(r.return_considered) + '</span></div>' +
+      soRetorno('<div class="salOpMetric"><span class="salOpMetricLabel">Retorno</span><span class="salOpMetricValue">' + fmtMoney(r.return_considered) + '</span></div>') +
       '<div class="salOpMetric"><span class="salOpMetricLabel">SPF Extra (70%)</span><span class="salOpMetricValue">' + fmtMoney(r.spf_70) + '</span></div>' +
-      '<div class="salOpMetric"><span class="salOpMetricLabel">Rentabilidade</span><span class="salOpMetricValue">' + fmtMoney(r.operation_profitability) + '</span></div>' +
+      soRetorno('<div class="salOpMetric"><span class="salOpMetricLabel">Rentabilidade</span><span class="salOpMetricValue">' + fmtMoney(r.operation_profitability) + '</span></div>') +
       (r.modality ? '<div class="salOpMetric"><span class="salOpMetricLabel">Modalidade</span><span class="salOpMetricValue">' + esc(r.modality) + '</span></div>' : '') +
       '</div>' +
       (r.applied_rule ? '<div class="salOpRowMeta">' + esc(r.applied_rule) + '</div>' : '') +
