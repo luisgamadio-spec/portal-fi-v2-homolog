@@ -11,7 +11,7 @@
   var S = window.NX_SIMULADOR_SHARED;
   var N = window.NX_SIMULADOR_NOVOS_ADAPTER;
   var CAMP = window.NX_CAMPANHA_ADAPTER;
-  var CT = window.NX_CASH_TELA; // Cash Conversion v2 (motor único com a Brabus IA)
+  var CC = window.NX_CASH_CONVERSION_ADAPTER;
   var GOVERNED = window.NX_COPARTICIPADO_GOVERNED_RATES_PROVIDER;
   var RATES = window.NX_SIMULADOR_RATES_PROVIDER;
 
@@ -351,7 +351,7 @@
     triton: 'Campanha Taxa 0% — entrada fixa por modelo, sem alteração manual.',
     descobridor: 'Estima a taxa efetiva a partir do valor financiado, prazo e parcela.',
     antecipacao: 'Calcula o valor com desconto para antecipação de parcelas.',
-    cashconversion: 'Compara pagar à vista com financiar e deixar o dinheiro aplicado: rendimento líquido de IR, custo pelo CET e taxas de referência com data e fonte.'
+    cashconversion: 'Compara o custo do financiamento com o rendimento de manter o capital aplicado.'
   };
   var TRAD_TERMS = [12, 24, 30, 36, 40, 42, 48];
   var PERIOD_TERMS = [24, 36, 48];
@@ -765,7 +765,11 @@
           '<div class="smBalloonList" id="nAntBaloesList"></div>' +
           '<button type="button" class="btn btn-primary" id="nCalc" style="width:100%;margin-top:6px">Calcular</button>';
       case 'cashconversion':
-        return CT.formHtml('novos', 'n');
+        return UI.moneyField('nCapital', 'Capital', 'R$ 100.000,00') +
+          UI.moneyField('nParcelaCC', 'Parcela ofertada', 'R$ 2.500,00') +
+          UI.numberField('nPrazoCC', 'Prazo (meses)', 36, { min: 1, max: 60 }) +
+          UI.percentField('nTaxaCC', 'Taxa de aplicação mensal (%)', '0,80') +
+          '<button type="button" class="btn btn-primary" id="nCalc" style="width:100%;margin-top:6px">Calcular</button>';
       default:
         return '';
     }
@@ -914,7 +918,7 @@
       if (antQtdSel) antQtdSel.addEventListener('change', function () { renderAntBaloesList(); });
       document.getElementById('nCalc').addEventListener('click', calcAntecipacao);
     } else if (mode === 'cashconversion') {
-      CT.wire('novos', 'n', setResult);
+      document.getElementById('nCalc').addEventListener('click', calcCashConversion);
     }
   }
 
@@ -1028,11 +1032,7 @@
     } else {
       html = UI.resultHero('Parcela mensal', r.parcela) + UI.secondaryGrid(secondary);
     }
-    var prazoT = Number(UI.getSegmentedValue('nPrazo'));
-    CT.registrar('novos', { plano: 'BALAO', capital: UI.moneyVal('nBem') - UI.moneyVal('nEntrada'),
-      rotulo: 'Tradicional (Balão) · ' + prazoT + 'x de ' + UI.brl(r.parcela) + (validBaloes.length ? ' + ' + validBaloes.length + ' balão(ões)' : ''),
-      opcoes: [{ id: 'unica', rotulo: prazoT + 'x', fluxo: CT.mensal(prazoT, r.parcela, validBaloes) }] });
-    setResult(html + CT.botaoHtml());
+    setResult(html);
   }
   function calcPeriodico() {
     var periodAuth = tradPeriodAuthority.getAuthority();
@@ -1047,10 +1047,7 @@
     // frozen engine's own computed list of installment numbers
     // (Gate 3/4/7), not re-derived or hardcoded here.
     html += scheduleBlockHtml({ prazoTotal: prazo, periodicidade: tipo === 'semestral' ? 'Semestral' : 'Anual', meses: r.meses });
-    CT.registrar('novos', { plano: 'SEMESTRAL_ANUAL', capital: UI.moneyVal('nBem') - UI.moneyVal('nEntrada'),
-      rotulo: (tipo === 'semestral' ? 'Semestral' : 'Anual') + ' · ' + r.meses.length + ' parcelas de ' + UI.brl(r.parcela) + ' em ' + prazo + ' meses',
-      opcoes: [{ id: 'unica', rotulo: prazo + ' meses', fluxo: CT.nosMeses(r.meses, r.parcela) }] });
-    setResult(html + CT.botaoHtml());
+    setResult(html);
   }
   function runParcelaUnica() {
     var r = N.calcularParcelaUnica({ bem: UI.moneyVal('nBem'), entrada: UI.moneyVal('nEntrada') });
@@ -1071,9 +1068,7 @@
     // from r.plano.prazo (the engine's own authoritative value) --
     // never hardcoded.
     html += scheduleBlockHtml({ prazoTotal: r.plano.prazo, meses: [r.plano.prazo], specialLabel: 'parcela única' });
-    CT.registrar('novos', { plano: 'PARCELA_UNICA', capital: r.fin, rotulo: 'Parcela Única · ' + UI.brl(r.parcela) + ' no mês ' + r.plano.prazo,
-      opcoes: [{ id: 'unica', rotulo: 'mês ' + r.plano.prazo, fluxo: CT.nosMeses([r.plano.prazo], r.parcela) }] });
-    setResult(html + CT.botaoHtml());
+    setResult(html);
   }
   function calcLinear() {
     var r = N.calcularLinear({ bem: UI.moneyVal('nBem'), entrada: UI.moneyVal('nEntrada'), tabelaLinear: linearAuthority.getAuthority() });
@@ -1082,9 +1077,7 @@
     var valid = r.itens.filter(function (x) { return x.parcela > 0; });
     var menor = valid.length ? Math.min.apply(null, valid.map(function (x) { return x.parcela; })) : null;
     var html = UI.termGrid(r.itens.map(function (x) { return { prazo: x.prazo, payment: x.parcela, rate: null, best: menor != null && x.parcela != null && Math.abs(x.parcela - menor) < 0.01 }; }));
-    CT.registrar('novos', { plano: 'LINEAR', capital: UI.moneyVal('nBem') - UI.moneyVal('nEntrada'), rotulo: 'Financiamento Linear',
-      opcoes: valid.map(function (x) { return { id: String(x.prazo), rotulo: x.prazo + 'x de ' + UI.brl(x.parcela), fluxo: CT.mensal(x.prazo, x.parcela) }; }) });
-    setResult('<p class="kpiLabel" style="margin-bottom:12px">Parcela por prazo — faixa de entrada ' + UI.pct1(r.faixa) + '</p>' + html + CT.botaoHtml());
+    setResult('<p class="kpiLabel" style="margin-bottom:12px">Parcela por prazo — faixa de entrada ' + UI.pct1(r.faixa) + '</p>' + html);
     wireResultTermGrid(r.itens.length);
   }
   function calcCampanha() {
@@ -1116,9 +1109,7 @@
       { label: 'Rebate total — custo comercial da taxa', value: UI.brl(r.rebateTotal) },
       { label: 'Rebate HPE', value: UI.brl(r.rebateHpe) }
     ]);
-    CT.registrar('novos', { plano: 'COPARTICIPADO', capital: r.financed, rotulo: 'Plano Coparticipado · ' + modelName,
-      opcoes: r.terms.filter(function (x) { return x.payment > 0; }).map(function (x) { return { id: String(x.prazo), rotulo: x.prazo + 'x de ' + UI.brl(x.payment), fluxo: CT.mensal(x.prazo, x.payment) }; }) });
-    setResult(html + CT.botaoHtml());
+    setResult(html);
     wireResultTermGrid(r.terms.length);
   }
   function calcSubsidiadas() {
@@ -1161,11 +1152,8 @@
       }).join('');
       return '<div class="smSubsidiadaGroup"><p class="smSubsidiadaGroupHead">' + UI.rateBadge(Number(taxa), true) + '</p><div class="smSubsidiadaGrid">' + cards + '</div></div>';
     }).join('');
-    CT.registrar('novos', { plano: 'TAXA_SUBSIDIADA', capital: UI.moneyVal('nBem') - UI.moneyVal('nEntrada'), rotulo: 'Taxas Subsidiadas',
-      opcoes: r.rows.filter(function (x) { return x.parcela > 0; }).slice().sort(function (a, b) { return a.taxa - b.taxa || a.prazo - b.prazo; }).map(function (x) {
-        return { id: x.taxa + '-' + x.prazo, rotulo: x.prazo + 'x a ' + UI.pct2(x.taxa) + ' a.m. — ' + UI.brl(x.parcela), fluxo: CT.mensal(x.prazo, x.parcela) }; }) });
     setResult('<div class="smSubsidiadaGroups">' + groupsHtml + '</div>' +
-      '<p class="smFootnote">Rebate é o custo comercial da taxa subsidiada — nunca um desconto concedido ao cliente. Valor final de venda já considera o valor líquido para a loja.</p>' + CT.botaoHtml());
+      '<p class="smFootnote">Rebate é o custo comercial da taxa subsidiada — nunca um desconto concedido ao cliente. Valor final de venda já considera o valor líquido para a loja.</p>');
   }
   function calcTriton() {
     var tritonAuth = tritonAuthority.getAuthority();
@@ -1188,9 +1176,7 @@
     // a separate hardcoded number.
     var tritonMeses = S.SEMESTRAL_TRITON_MESES;
     html += scheduleBlockHtml({ prazoTotal: Math.max.apply(null, tritonMeses), periodicidade: 'Semestral', meses: tritonMeses });
-    CT.registrar('novos', { plano: 'SEMESTRAL_TAXA_ZERO', capital: r.financiado, rotulo: 'Semestral Taxa 0% · ' + UI.textVal('nModelo') + ' · ' + tritonMeses.length + ' semestrais de ' + UI.brl(r.parcela),
-      opcoes: [{ id: 'unica', rotulo: '24 meses', fluxo: CT.nosMeses(tritonMeses, r.parcela) }] });
-    setResult(html + '<p class="smFootnote">Entrada fixa por modelo — não permite alteração manual.</p>' + CT.botaoHtml());
+    setResult(html + '<p class="smFootnote">Entrada fixa por modelo — não permite alteração manual.</p>');
   }
   function calcDescobridor() {
     var r = N.calcularDescobridor({ financiado: UI.moneyVal('nFinanciado'), prazo: UI.numVal('nPrazoNum'), parcela: UI.moneyVal('nParcela') });
@@ -1234,6 +1220,20 @@
     html += '<div class="smTableWrap"><table class="smTable"><thead><tr><th>Parcela</th><th>Vencimento</th><th>Valor bruto</th><th>Desconto</th><th>Valor final</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     setResult(html);
   }
+  function calcCashConversion() {
+    var taxaPct = Number(String(UI.textVal('nTaxaCC')).replace(',', '.')) || 0;
+    var r = CC.compute({ capital: UI.moneyVal('nCapital'), parcela: UI.moneyVal('nParcelaCC'), prazoMeses: UI.numVal('nPrazoCC'), taxaAplicacao: taxaPct / 100 });
+    if (!r) { setResult(UI.errorBlock('Não foi possível calcular com os dados informados.')); return; }
+    var html = '<div class="resultHero"><p class="kpiLabel">Classificação</p><p><span class="smClassBadge ' + r.classificacao + '">' + r.classificacao + '</span></p></div>';
+    html += UI.secondaryGrid([
+      { label: 'Valor final do financiamento', value: UI.brl(r.valorFinalFinanciamento) },
+      { label: 'Capital final projetado', value: UI.brl(r.valorFuturoAplicacao) },
+      { label: 'Rendimento projetado', value: UI.brl(r.rendimentoAplicacao) },
+      { label: 'Diferença projetada', value: UI.brl(r.diferencaProjetada) }
+    ]);
+    setResult(html);
+  }
+
   window.NX_SIMULADOR_NOVOS_PAGE = {
     // Exposed read-only for deterministic presentation testing
     // (tests/simulador-novos-presentation-test.py), same pattern
@@ -1250,11 +1250,9 @@
       currentMode = MODES[0].id;
       balloons = [];
       antBaloes = [];
-      CT.limpar('novos');
-      CT.aoIrPara('novos', function () { switchMode('cashconversion'); });
       openCategory = null; // SIM-NAV-4 / F.2: all categories collapsed on entry
       outlet.innerHTML =
-        '<div class="smPage" data-origem="novos">' +
+        '<div class="smPage">' +
         '<span class="smProductBadge">Simulador · Novos</span>' +
         '<div class="modPageHeader"><div class="modHeaderMain"><h1 class="modTitle">Simulador de Financiamento — Novos</h1><p class="modSubtitle">Motores extraídos e verificados (PORTAL-NEXT-08) — 0 recálculo de fórmula nesta interface.</p></div>' + analystCtaHtml('simulador_novos') + '</div>' +
         '<div id="smModeNavRegion">' + modeNavHtml() + '</div>' +

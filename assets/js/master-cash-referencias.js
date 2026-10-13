@@ -1,5 +1,5 @@
 /* PORTAL-NEXT V2 — Painel Master › Referências de Mercado (Cash Conversion).
-   Lê a referência vigente (cash_referencias_mercado) e grava uma nova
+   A Brabus IA usa estas taxas. Lê a referência vigente (cash_referencias_mercado) e grava uma nova
    (master_salvar_cash_referencias_mercado — o banco só aceita o Master e valida tudo).
    Fora da produção (homolog/local) a gravação é SIMULADA, como nas outras seções travadas do Painel Master.
    Usado pelo shell-admin.js: NX_MASTER_CASH_REF.render(panel, { producao, voltar }). */
@@ -122,8 +122,8 @@
   }
 
   function render(panel, ctx) {
-    var html = '<h2>Referências de Mercado</h2><p class="note">Taxas usadas pelo Cash Conversion dos simuladores e pela Brabus IA (o mesmo motor). Só o Master atualiza. ' +
-      'Passados 50 dias da vigência, a tela e a IA avisam que as taxas podem estar desatualizadas (o intervalo entre reuniões do Copom chega a 49 dias).</p>';
+    var html = '<h2>Referências de Mercado</h2><p class="note">Taxas usadas pela Brabus IA nos argumentos de Cash Conversion. Só o Master atualiza.' +
+      'Passados 50 dias da vigência, a IA avisa que as taxas podem estar desatualizadas (o intervalo entre reuniões do Copom chega a 49 dias).</p>';
     if (!ctx.producao) html += '<p class="note gbWarn gbHomologBanner">🧪 MODO HOMOLOGAÇÃO — a gravação é simulada; nada é alterado no banco.</p>';
     if (estado.mensagem) html += '<p class="note ' + (estado.mensagem.ok ? 'mcrOk' : 'gbWarn') + '">' + esc(estado.mensagem.texto) + '</p>';
     if (estado.carregando) {
@@ -166,8 +166,7 @@
     rpc('master_salvar_cash_referencias_mercado', { p_dados: d }).then(function (res) {
       estado.confirmar = null;
       if (res && res.sucesso) {
-        estado.mensagem = { ok: true, texto: 'Referência de ' + dataBr(d.vigencia) + ' gravada. Simuladores e Brabus IA passam a usá-la' + (d.vigencia > hojeSP() ? ' a partir dessa data.' : ' agora (quem estiver com a tela aberta precisa recarregar).') };
-        if (window.NX_CASH_TELA) window.NX_CASH_TELA.esquecerReferencias();
+        estado.mensagem = { ok: true, texto: 'Referência de ' + dataBr(d.vigencia) + ' gravada. A Brabus IA passa a usá-la' + (d.vigencia > hojeSP() ? ' a partir dessa data.' : ' agora (quem estiver com a tela aberta precisa recarregar).') };
         carregar(panel, ctx);
       } else {
         estado.mensagem = { ok: false, texto: (res && res.mensagem) || 'O banco recusou a referência.' };
