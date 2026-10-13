@@ -749,8 +749,8 @@
   // --- cash ------------------------------------------------------------
   var RECOMENDACAO = { FINANCIAR: 'biChipGood', UTILIZAR: 'biChipNeutral', EQUIVALENTE: 'biChipMuted' };
 
-  // Cash Conversion v2 (motor único com a tela): frase para o cliente, CET, tabela por aplicação
-  // nos dois cenários, avisos, fonte e o rodapé obrigatório. O formato antigo continua abaixo.
+  // Cash Conversion v2: frase para o cliente; conta favorável = CET e tabela por aplicação nos dois cenários;
+  // demais casos = reserva preservada e argumentos de liquidez. Avisos, fonte e rodapé sempre. O formato antigo continua abaixo.
   var RESULTADO_CASH = {
     FINANCIAR_COMPENSA: ['Financiar compensa', 'biChipGood'],
     A_VISTA_COMPENSA: ['À vista sai mais barato', 'biChipNeutral'],
@@ -767,11 +767,23 @@
     hero.appendChild(el('span', 'biCashRead', String(b.frase_cliente || '')));
     top.appendChild(hero);
     var res = [];
-    if (num(b.capital) != null) res.push(['Valor que pagaria à vista', fmt(b.capital, 'brl')]);
-    if (num(b.total_pago) != null) res.push(['Total pago no financiamento', fmt(b.total_pago, 'brl') + (num(b.pagamentos) != null ? ' (' + b.pagamentos + ' pagamentos)' : '')]);
-    if (num(b.cet_pct_am) != null) res.push(['CET do financiamento', fmt(b.cet_pct_am, 'taxa2')]);
+    var favoravel = !b.modo || b.modo === 'conta_favoravel';
+    // Fora da conta favorável o cartão não compara com o à vista: mostra a reserva preservada e os argumentos.
+    if (num(b.capital) != null) res.push([favoravel ? 'Dinheiro mantido aplicado' : 'Reserva preservada', fmt(b.capital, 'brl')]);
+    if (num(b.total_pago) != null) res.push(['Total dos pagamentos', fmt(b.total_pago, 'brl') + (num(b.pagamentos) != null ? ' (' + b.pagamentos + ' pagamentos)' : '')]);
+    if (favoravel && num(b.cet_pct_am) != null) res.push(['CET do financiamento', fmt(b.cet_pct_am, 'taxa2')]);
     if (res.length) top.appendChild(linhasDl(res));
     card.appendChild(top);
+    if (b.resposta_financeira_curta) card.appendChild(el('p', 'biCardNote', String(b.resposta_financeira_curta)));
+    var args = (Array.isArray(b.argumentos_liquidez) ? b.argumentos_liquidez : []).filter(Boolean);
+    if (args.length) {
+      var secA = el('div', 'biSection');
+      secA.appendChild(el('p', 'biBlockLabel', 'Argumentos de liquidez e segurança'));
+      var ul = el('ul', 'biCashArgs');
+      args.forEach(function (x) { ul.appendChild(el('li', '', String(x))); });
+      secA.appendChild(ul);
+      card.appendChild(secA);
+    }
     [['cenario_focus_conservador', 'Selic em queda (Boletim Focus) — cenário principal'], ['cenario_cdi_atual_constante', 'CDI atual constante — comparação']].forEach(function (c) {
       var linhas = (Array.isArray(b[c[0]]) ? b[c[0]] : []).filter(Boolean);
       if (!linhas.length) return;
@@ -793,7 +805,7 @@
   }
 
   function blocoCash(b) {
-    if (b && (b.cenario_focus_conservador || b.frase_cliente)) return blocoCashV2(b);
+    if (b && (b.cenario_focus_conservador || b.frase_cliente || b.modo)) return blocoCashV2(b);
     var card = el('div', 'biCard biCardCash');
     card.appendChild(cabecalhoCartao(b.titulo, []));
     var top = el('div', 'biCashTop');
