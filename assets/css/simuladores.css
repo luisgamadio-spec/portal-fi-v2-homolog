@@ -506,6 +506,17 @@
 .smClassBadge.EQUIVALENTE { background: var(--color-surface-2); color: var(--color-text-secondary); }
 
 .smFootnote { font-size: 0.6875rem; color: var(--color-text-muted); margin-top: var(--space-3); line-height: 1.5; }
+/* Cash Conversion v2 */
+.smCashOrigem { padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: var(--space-3); background: var(--color-surface-2); }
+.smCashOrigemNome { font-weight: 600; margin: 2px 0 4px; overflow-wrap: anywhere; }
+.smCashFrase { padding: var(--space-3) var(--space-4); border-left: 3px solid var(--color-border-strong, var(--color-border)); background: var(--color-surface-2); border-radius: var(--radius-sm); margin: var(--space-3) 0; }
+.smCashFraseTexto { font-size: 0.9375rem; line-height: 1.5; margin: 4px 0 8px; color: var(--color-text-primary); }
+.smCashFrase .hint { display: block; margin-bottom: 4px; }
+.smCashLink { margin-top: var(--space-3); }
+.smCashAviso { color: var(--color-warning); font-weight: 500; }
+/* A tabela do Cash Conversion é larga: no celular ela rola dentro da caixa, sem esticar a grade (que estava levando o formulário junto). */
+.smGrid:has(.smCashFrase, .smCashOrigem, [id$="CdiCC"]) > * { min-width: 0; }
+.smGrid:has(.smCashFrase) .smTableWrap { overflow-x: auto; max-width: 100%; }
 
 @media (max-width: 480px) {
   .smBalloonRow { grid-template-columns: 1fr; }

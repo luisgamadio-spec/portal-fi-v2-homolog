@@ -749,7 +749,51 @@
   // --- cash ------------------------------------------------------------
   var RECOMENDACAO = { FINANCIAR: 'biChipGood', UTILIZAR: 'biChipNeutral', EQUIVALENTE: 'biChipMuted' };
 
+  // Cash Conversion v2 (motor único com a tela): frase para o cliente, CET, tabela por aplicação
+  // nos dois cenários, avisos, fonte e o rodapé obrigatório. O formato antigo continua abaixo.
+  var RESULTADO_CASH = {
+    FINANCIAR_COMPENSA: ['Financiar compensa', 'biChipGood'],
+    A_VISTA_COMPENSA: ['À vista sai mais barato', 'biChipNeutral'],
+    EQUIVALENTE: ['Equivalente', 'biChipMuted']
+  };
+  function blocoCashV2(b) {
+    var card = el('div', 'biCard biCardCash');
+    card.appendChild(cabecalhoCartao(b.titulo, []));
+    var ref = b.referencias || {};
+    if (ref.desatualizada) card.appendChild(el('p', 'biCardNote', 'As taxas de referência são de ' + (ref.vigencia || '—') + ' e podem estar desatualizadas.'));
+    var top = el('div', 'biCashTop');
+    var hero = el('div', 'biCashHero');
+    hero.appendChild(el('span', 'biFigLabel', 'Para o cliente'));
+    hero.appendChild(el('span', 'biCashRead', String(b.frase_cliente || '')));
+    top.appendChild(hero);
+    var res = [];
+    if (num(b.capital) != null) res.push(['Valor que pagaria à vista', fmt(b.capital, 'brl')]);
+    if (num(b.total_pago) != null) res.push(['Total pago no financiamento', fmt(b.total_pago, 'brl') + (num(b.pagamentos) != null ? ' (' + b.pagamentos + ' pagamentos)' : '')]);
+    if (num(b.cet_pct_am) != null) res.push(['CET do financiamento', fmt(b.cet_pct_am, 'taxa2')]);
+    if (res.length) top.appendChild(linhasDl(res));
+    card.appendChild(top);
+    [['cenario_focus_conservador', 'Selic em queda (Boletim Focus) — cenário principal'], ['cenario_cdi_atual_constante', 'CDI atual constante — comparação']].forEach(function (c) {
+      var linhas = (Array.isArray(b[c[0]]) ? b[c[0]] : []).filter(Boolean);
+      if (!linhas.length) return;
+      var sec = el('div', 'biSection');
+      sec.appendChild(el('p', 'biBlockLabel', c[1]));
+      sec.appendChild(tabela([['Aplicação', false], ['IR', true], ['Ganho/perda líquida', true], ['Equilíbrio (CET)', true], ['Resultado', false]],
+        linhas.map(function (p) {
+          var r = RESULTADO_CASH[String(p.resultado || '')] || [String(p.resultado || '—'), 'biChipMuted'];
+          return { cells: [String(p.produto || '—') + (p.isento_ir ? ' (isenta de IR)' : ''), fmt(p.ir, 'brl'), fmt(p.ganho_liquido, 'brl'),
+            fmt(p.ponto_equilibrio_cet_pct_am, 'taxa2'), chip(r[0], r[1])] };
+        }), { cls: 'biStickyFirst' }));
+      card.appendChild(sec);
+    });
+    (Array.isArray(b.avisos) ? b.avisos : []).forEach(function (a) { card.appendChild(el('p', 'biCardNote', String(a))); });
+    if (b.leitura_taxas) card.appendChild(el('p', 'biCardNote', String(b.leitura_taxas)));
+    if (b.fonte) card.appendChild(el('p', 'biCardNote', String(b.fonte)));
+    if (b.rodape_obrigatorio) card.appendChild(el('p', 'biCardNote', String(b.rodape_obrigatorio)));
+    return card;
+  }
+
   function blocoCash(b) {
+    if (b && (b.cenario_focus_conservador || b.frase_cliente)) return blocoCashV2(b);
     var card = el('div', 'biCard biCardCash');
     card.appendChild(cabecalhoCartao(b.titulo, []));
     var top = el('div', 'biCashTop');

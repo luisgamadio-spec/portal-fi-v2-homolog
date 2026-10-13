@@ -37,7 +37,7 @@
   var UI = window.NX_SIM_UI;
   var S = window.NX_SIMULADOR_SHARED;
   var SN = window.NX_SIMULADOR_SEMINOVOS_ADAPTER;
-  var CC = window.NX_CASH_CONVERSION_ADAPTER;
+  var CT = window.NX_CASH_TELA; // Cash Conversion v2 (motor único com a Brabus IA)
   var RATES = window.NX_SIMULADOR_RATES_PROVIDER;
 
   /* ---------- SIMLIVE1 (migrate simulator live rate authorities) ----------
@@ -157,7 +157,7 @@
     ratetable: 'Condições próprias por ano do veículo e faixa de entrada — inclui prazo de 50x.',
     descobridor: 'Estima a taxa efetiva a partir do valor financiado, prazo e parcela.',
     antecipacao: 'Calcula o valor com desconto para antecipação de parcelas.',
-    cashconversion: 'Compara o custo do financiamento com o rendimento de manter o capital aplicado.'
+    cashconversion: 'Compara pagar à vista com financiar e deixar o dinheiro aplicado: rendimento líquido de IR, custo pelo CET e taxas de referência com data e fonte.'
   };
   var TRAD_TERMS = [12, 24, 30, 36, 40, 42, 48];
 
@@ -499,11 +499,7 @@
           '<div class="smBalloonList" id="sAntBaloesList"></div>' +
           '<button type="button" class="btn btn-primary" id="sCalc" style="width:100%;margin-top:6px">Calcular</button>';
       case 'cashconversion':
-        return UI.moneyField('sCapital', 'Capital', 'R$ 100.000,00') +
-          UI.moneyField('sParcelaCC', 'Parcela ofertada', 'R$ 2.500,00') +
-          UI.numberField('sPrazoCC', 'Prazo (meses)', 36, { min: 1, max: 60 }) +
-          UI.percentField('sTaxaCC', 'Taxa de aplicação mensal (%)', '0,80') +
-          '<button type="button" class="btn btn-primary" id="sCalc" style="width:100%;margin-top:6px">Calcular</button>';
+        return CT.formHtml('seminovos', 's');
       default:
         return '';
     }
@@ -624,7 +620,7 @@
       if (antQtdSel) antQtdSel.addEventListener('change', function () { renderAntBaloesList(); });
       document.getElementById('sCalc').addEventListener('click', calcAntecipacao);
     } else if (mode === 'cashconversion') {
-      document.getElementById('sCalc').addEventListener('click', calcCashConversion);
+      CT.wire('seminovos', 's', setResult);
     }
   }
 
@@ -710,14 +706,19 @@
     } else {
       html = UI.resultHero('Parcela mensal', r.parcela) + UI.secondaryGrid(secondary);
     }
-    setResult(html);
+    CT.registrar('seminovos', { plano: 'BALAO', capital: UI.moneyVal('sBem') - UI.moneyVal('sEntrada'),
+      rotulo: 'Tradicional (Balão) Seminovos · ' + prazo + 'x de ' + UI.brl(r.parcela) + (validBaloes.length ? ' + ' + validBaloes.length + ' balão(ões)' : ''),
+      opcoes: [{ id: 'unica', rotulo: prazo + 'x', fluxo: CT.mensal(prazo, r.parcela, validBaloes) }] });
+    setResult(html + CT.botaoHtml());
   }
   function calcRateTable() {
     var r = SN.calcularLinearRateTable({ ano: UI.numVal('sAnoRT'), valor: UI.moneyVal('sValorRT'), entrada: UI.moneyVal('sEntradaRT'), rateTable: linearRTAuthority.getAuthority() });
     if (r.invalid) { setResult(UI.errorBlock('Verifique o ano do veículo e a entrada informada (entrada não pode ser maior que o valor do veículo, nem o percentual maior que 100%).')); return; }
     var html = UI.termGrid(r.terms.map(function (t) { return { prazo: t.prazo, payment: t.payment, rate: t.rate, best: false }; }));
+    CT.registrar('seminovos', { plano: 'LINEAR', capital: UI.moneyVal('sValorRT') - UI.moneyVal('sEntradaRT'), rotulo: 'Linear Seminovos',
+      opcoes: r.terms.filter(function (x) { return x.payment > 0; }).map(function (x) { return { id: String(x.prazo), rotulo: x.prazo + 'x de ' + UI.brl(x.payment), fluxo: CT.mensal(x.prazo, x.payment) }; }) });
     setResult('<p class="kpiLabel" style="margin-bottom:12px">Parcela por prazo — faixa ' + (r.band || '—') + ' · entrada ' + r.eBand + '%</p>' + html +
-      '<p class="smFootnote">Financiado: ' + UI.brl(r.financiado) + '</p>');
+      '<p class="smFootnote">Financiado: ' + UI.brl(r.financiado) + '</p>' + CT.botaoHtml());
     wireResultTermGrid(r.terms.length);
   }
   function calcDescobridor() {
@@ -761,28 +762,16 @@
     html += '<div class="smTableWrap"><table class="smTable"><thead><tr><th>Parcela</th><th>Vencimento</th><th>Valor bruto</th><th>Desconto</th><th>Valor final</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     setResult(html);
   }
-  function calcCashConversion() {
-    var taxaPct = Number(String(UI.textVal('sTaxaCC')).replace(',', '.')) || 0;
-    var r = CC.compute({ capital: UI.moneyVal('sCapital'), parcela: UI.moneyVal('sParcelaCC'), prazoMeses: UI.numVal('sPrazoCC'), taxaAplicacao: taxaPct / 100 });
-    if (!r) { setResult(UI.errorBlock('Não foi possível calcular com os dados informados.')); return; }
-    var html = '<div class="resultHero"><p class="kpiLabel">Classificação</p><p><span class="smClassBadge ' + r.classificacao + '">' + r.classificacao + '</span></p></div>';
-    html += UI.secondaryGrid([
-      { label: 'Valor final do financiamento', value: UI.brl(r.valorFinalFinanciamento) },
-      { label: 'Capital final projetado', value: UI.brl(r.valorFuturoAplicacao) },
-      { label: 'Rendimento projetado', value: UI.brl(r.rendimentoAplicacao) },
-      { label: 'Diferença projetada', value: UI.brl(r.diferencaProjetada) }
-    ]);
-    setResult(html);
-  }
-
   window.NX_SIMULADOR_SEMINOVOS_PAGE = {
     render: function (outlet) {
       currentMode = MODES[0].id;
       balloons = [];
       antBaloes = [];
+      CT.limpar('seminovos');
+      CT.aoIrPara('seminovos', function () { switchMode('cashconversion'); });
       openCategory = null; // SIM-NAV-4 / F.2: all categories collapsed on entry
       outlet.innerHTML =
-        '<div class="smPage">' +
+        '<div class="smPage" data-origem="seminovos">' +
         '<span class="smProductBadge">Simulador · Seminovos</span>' +
         '<div class="modPageHeader"><div class="modHeaderMain"><h1 class="modTitle">Simulador de Financiamento — Seminovos</h1><p class="modSubtitle">Motores extraídos e verificados (PORTAL-NEXT-08) — 0 recálculo de fórmula nesta interface.</p></div>' + analystCtaHtml('simulador_seminovos') + '</div>' +
         '<div id="smModeNavRegion">' + modeNavHtml() + '</div>' +
