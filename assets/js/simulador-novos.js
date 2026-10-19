@@ -664,7 +664,7 @@
   function wireResultTermGrid(itemCount) {
     var grid = document.querySelector('#smResultRegion .smTermGrid');
     if (!grid) return;
-    var ro = UI.wireTermResultGrid(grid, 132, itemCount);
+    var ro = UI.wireTermResultGrid(grid, 130, itemCount);
     if (ro) termGridObservers.push(ro);
   }
 
@@ -678,6 +678,7 @@
         return UI.moneyField('nBem', 'Valor do bem', 'R$ 100.000,00') +
           UI.entryField('nEntrada', 'Entrada', 'R$ 20.000,00', 'nBem') +
           '<span class="hint smBalaoLimite" id="nBalaoLimite" aria-live="polite" hidden></span>' +
+          UI.balanceField('nSaldo', 'nBem', 'nEntrada') +
           termGridFieldHtml('nPrazo', 'Prazo', TRAD_TERMS, 48) +
           '<div class="field"><label>Balões</label>' +
           '<div class="smBalloonList" id="nBaloesList"></div>' +
@@ -690,6 +691,7 @@
         if (tradPeriodAuthority.getState() !== 'READY') return authorityGateHtml(tradPeriodAuthority);
         return UI.moneyField('nBem', 'Valor do bem', 'R$ 100.000,00') +
           UI.entryField('nEntrada', 'Entrada', 'R$ 20.000,00', 'nBem') +
+          UI.balanceField('nSaldo', 'nBem', 'nEntrada') +
           termGridFieldHtml('nPrazo', 'Prazo', PERIOD_TERMS, 48) +
           UI.segmentedField('nTipo', 'Periodicidade', [{ value: 'semestral', label: 'Semestral' }, { value: 'anual', label: 'Anual' }], 'semestral') +
           '<button type="button" class="btn btn-primary" id="nCalc" style="width:100%;margin-top:6px">Calcular</button>';
@@ -699,12 +701,14 @@
         // permanently hardcoded even in V1. Untouched.
         return UI.moneyField('nBem', 'Valor do bem', 'R$ 100.000,00') +
           UI.entryField('nEntrada', 'Entrada', 'R$ 50.000,00', 'nBem') +
+          UI.balanceField('nSaldo', 'nBem', 'nEntrada') +
           '<button type="button" class="btn btn-primary" id="nCalc" style="width:100%;margin-top:6px">Calcular</button>';
       case 'linear':
         // SIMLIVE1: gated on linearAuthority (simulador_get_linear_zerokm).
         if (linearAuthority.getState() !== 'READY') return authorityGateHtml(linearAuthority);
         return UI.moneyField('nBem', 'Valor do bem', 'R$ 100.000,00') +
-          UI.entryField('nEntrada', 'Entrada', 'R$ 20.000,00', 'nBem', 'Recalcula automaticamente, sem botão Calcular (comportamento original).');
+          UI.entryField('nEntrada', 'Entrada', 'R$ 20.000,00', 'nBem') +
+          UI.balanceField('nSaldo', 'nBem', 'nEntrada');
       case 'campanha':
         // Governed-authority gated: no form/Calcular exists unless
         // campState === 'READY' -- see the module-level comment above
@@ -720,6 +724,7 @@
         return UI.selectField('nModelo', 'Modelo', campAuthority.modelNames.map(function (name) { return { value: name, label: name }; }), campAuthority.modelNames[0]) +
           UI.moneyField('nSale', 'Valor de venda', 'R$ 200.000,00') +
           UI.entryField('nEntry', 'Entrada', 'R$ 120.000,00', 'nSale') +
+          UI.balanceField('nSaldo', 'nSale', 'nEntry') +
           '<button type="button" class="btn btn-primary" id="nCalc" style="width:100%;margin-top:6px">Calcular</button>';
       case 'subsidiadas':
         // SIMLIVE1: gated on subsidiadasAuthority (simulador_get_taxas_subsidiadas).
@@ -729,6 +734,7 @@
         if (subsidiadasAuthority.getState() !== 'READY') return authorityGateHtml(subsidiadasAuthority);
         return UI.moneyField('nBem', 'Valor do bem', 'R$ 100.000,00') +
           UI.entryField('nEntrada', 'Entrada', 'R$ 50.000,00', 'nBem') +
+          UI.balanceField('nSaldo', 'nBem', 'nEntrada') +
           UI.moneyField('nMinVenda', 'Valor mínimo de venda (opcional)', '') +
           '<button type="button" class="btn btn-primary" id="nCalc" style="width:100%;margin-top:6px">Calcular</button>' +
           '<div id="nBankRateWidgetRegion">' + bankRateWidgetHtml() + '</div>';
@@ -941,16 +947,17 @@
   }
   function renderBalloonStory(prazo, parcela, validBaloes) {
     var s = balloonScheduleSummary(prazo, parcela, validBaloes);
-    var html = '<div class="resultHero"><p class="kpiLabel">Plano simulado</p>';
-    if (s.regularCount > 0) {
-      html += '<p class="smPlanRegular"><span class="smPlanRegularCount">' + s.regularCount + 'x</span> de <span class="resultValue smPlanRegularValue">' + UI.brl(s.regularValue) + '</span></p>';
-    }
+    // Texto do vendedor: "36x de R$ X + balão de R$ Y no mês 36" (todas as
+    // parcelas do prazo; o balão é pago junto com a parcela daquele mês).
+    var html = '<div class="resultHero"><p class="kpiLabel">Plano simulado</p>' +
+      '<p class="smPlanRegular"><span class="smPlanRegularCount">' + prazo + 'x</span> de <span class="resultValue smPlanRegularValue">' + UI.brl(parcela) + '</span></p>';
+    html += s.specials.map(function (sp) {
+      return '<p class="smPlanBalao">+ balão de <strong>' + UI.brl(sp.balao) + '</strong> no mês ' + sp.mes + '</p>';
+    }).join('');
     html += '</div>';
     html += '<div class="smPlanSpecials">' + s.specials.map(function (sp) {
-      return '<div class="smPlanSpecialRow"><span class="kpiLabel">Parcela ' + sp.mes + '</span><span class="smPlanSpecialValue">' + UI.brl(sp.total) + '</span>' +
-        '<span class="smPlanSpecialBreakdown">' + UI.brl(parcela) + ' (parcela) + ' + UI.brl(sp.balao) + ' (balão)</span></div>';
+      return '<div class="smPlanSpecialRow"><span class="kpiLabel">Mês ' + sp.mes + ' (parcela + balão)</span><span class="smPlanSpecialValue">' + UI.brl(sp.total) + '</span></div>';
     }).join('') + '</div>';
-    html += '<p class="smFootnote">Total de parcelas do plano: ' + prazo + '. Os meses com balão substituem o valor da parcela regular naquele mês por um valor especial (parcela + balão) — não são parcelas adicionais.</p>';
     return html;
   }
 
@@ -1063,7 +1070,7 @@
     // percentage, never claiming a monthly/annual period for this
     // specific flat-coefficient plan -- verified from source, not
     // guessed (Gate 13).
-    html += UI.secondaryGrid([{ label: 'Entrada', value: UI.pct1(r.pe) }, { label: 'Financiado', value: UI.brl(r.fin) }, { label: 'Taxa da tabela', value: UI.pct2(r.taxa) }]);
+    html += UI.secondaryGrid([{ label: 'Entrada', value: UI.pct1(r.pe) }, { label: 'Taxa da tabela', value: UI.pct2(r.taxa) }]);
     // Gate 8: explicit prazo total + single special month, derived
     // from r.plano.prazo (the engine's own authoritative value) --
     // never hardcoded.
@@ -1074,10 +1081,9 @@
     var r = N.calcularLinear({ bem: UI.moneyVal('nBem'), entrada: UI.moneyVal('nEntrada'), tabelaLinear: linearAuthority.getAuthority() });
     if (r.empty) { setResult(UI.emptyBlock('Preencha o valor do bem e a entrada para visualizar todos os prazos.')); return; }
     if (r.error) { setResult(UI.errorBlock(errMsg(r.error))); return; }
-    var valid = r.itens.filter(function (x) { return x.parcela > 0; });
-    var menor = valid.length ? Math.min.apply(null, valid.map(function (x) { return x.parcela; })) : null;
-    var html = UI.termGrid(r.itens.map(function (x) { return { prazo: x.prazo, payment: x.parcela, rate: null, best: menor != null && x.parcela != null && Math.abs(x.parcela - menor) < 0.01 }; }));
-    setResult('<p class="kpiLabel" style="margin-bottom:12px">Parcela por prazo — faixa de entrada ' + UI.pct1(r.faixa) + '</p>' + html);
+    var html = UI.termGrid(r.itens.map(function (x) { return { prazo: x.prazo, payment: x.parcela, rate: null, best: false }; }));
+    setResult('<div class="smResultHead"><p class="kpiLabel">Parcela por prazo</p>' +
+      '<p class="smResultHeadNote">Taxa da faixa de entrada a partir de ' + UI.fmtEntryPct(r.faixa) + '%</p></div>' + html);
     wireResultTermGrid(r.itens.length);
   }
   function calcCampanha() {
@@ -1098,17 +1104,16 @@
     // parcela-per-prazo is supporting context first, then Rebate
     // Brabus + Valor Final de Venda get a dedicated emphasized block
     // (visual only; the values themselves are untouched engine output).
-    var html = '<p class="kpiLabel" style="margin-bottom:12px">Parcela por prazo</p>' +
+    // Wave 2: rebate em 3 colunas iguais (total, HPE, Brabus) e o valor
+    // final de venda em destaque logo abaixo -- os valores são os do motor.
+    var html = '<div class="smResultHead"><p class="kpiLabel">Parcela por prazo</p></div>' +
       UI.termGrid(r.terms.map(function (t) { return { prazo: t.prazo, payment: t.payment, rate: t.rate, best: false }; }));
-    html += '<div class="smEmphasisPair">' +
-      '<div class="smEmphasisCard"><p class="kpiLabel">Rebate Brabus</p><p class="smEmphasisValue">' + UI.brl(r.rebateBrabus) + '</p></div>' +
-      '<div class="smEmphasisCard smEmphasisCardPrimary"><p class="kpiLabel">Valor final de venda</p><p class="smEmphasisValue smEmphasisValuePrimary">' + UI.brl(r.finalSale) + '</p></div>' +
+    html += '<div class="smRebateTrio">' +
+      '<div class="smRebateCard"><p class="kpiLabel">Rebate total</p><p class="smRebateValue">' + UI.brl(r.rebateTotal) + '</p><p class="smRebateNote">custo comercial da taxa</p></div>' +
+      '<div class="smRebateCard"><p class="kpiLabel">Rebate HPE</p><p class="smRebateValue">' + UI.brl(r.rebateHpe) + '</p></div>' +
+      '<div class="smRebateCard"><p class="kpiLabel">Rebate Brabus</p><p class="smRebateValue">' + UI.brl(r.rebateBrabus) + '</p></div>' +
       '</div>';
-    html += UI.secondaryGrid([
-      { label: 'Financiado', value: UI.brl(r.financed) },
-      { label: 'Rebate total — custo comercial da taxa', value: UI.brl(r.rebateTotal) },
-      { label: 'Rebate HPE', value: UI.brl(r.rebateHpe) }
-    ]);
+    html += '<div class="smEmphasisCard smEmphasisCardPrimary smFinalSale"><p class="kpiLabel">Valor final de venda</p><p class="smEmphasisValue smEmphasisValuePrimary">' + UI.brl(r.finalSale) + '</p></div>';
     setResult(html);
     wireResultTermGrid(r.terms.length);
   }
@@ -1163,7 +1168,7 @@
       UI.resultHero('Parcela (4x semestrais)', r.parcela);
     html += UI.secondaryGrid([
       { label: 'Entrada fixa (' + UI.pct1(r.entradaPct != null ? r.entradaPct : 0.6) + ')', value: UI.brl(r.entrada) },
-      { label: 'Financiado', value: UI.brl(r.financiado) },
+      { label: 'Saldo financiado', value: UI.brl(r.financiado) },
       { label: 'Rebate total — custo comercial', value: UI.brl(r.rebateTotal) },
       { label: 'Rebate Brabus', value: UI.brl(r.rebateBrabus) },
       { label: 'Rebate HPE', value: UI.brl(r.rebateHpe) },
@@ -1254,7 +1259,7 @@
       outlet.innerHTML =
         '<div class="smPage">' +
         '<span class="smProductBadge">Simulador · Novos</span>' +
-        '<div class="modPageHeader"><div class="modHeaderMain"><h1 class="modTitle">Simulador de Financiamento — Novos</h1><p class="modSubtitle">Motores extraídos e verificados (PORTAL-NEXT-08) — 0 recálculo de fórmula nesta interface.</p></div>' + analystCtaHtml('simulador_novos') + '</div>' +
+        '<div class="modPageHeader"><div class="modHeaderMain"><h1 class="modTitle">Simulador de Financiamento — Novos</h1><p class="modSubtitle">Escolha a modalidade, informe o valor e a entrada e veja as parcelas.</p></div>' + analystCtaHtml('simulador_novos') + '</div>' +
         '<div id="smModeNavRegion">' + modeNavHtml() + '</div>' +
         '<p class="smModeDesc" id="smModeDesc"></p>' +
         '<div class="smGrid" id="smMainGrid"><div class="modPanelForm smFormCard" id="smFormRegion"></div><div class="modPanelResult" id="smResultRegion" aria-live="polite" aria-atomic="true"></div></div>' +
