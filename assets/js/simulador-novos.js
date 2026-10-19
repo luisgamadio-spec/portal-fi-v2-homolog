@@ -260,16 +260,36 @@
      Own loading/error/ready state (taxaBotaoAuthority) — never blocks
      Taxas Subsidiadas' own Calcular. Only the formatted
      rate is ever shown/copied — no raw RPC payload exposed. */
-  // Wave 2 (19/10/2026): o "Copiar taxa banco" virou um botão pequeno em
-  // cada cartão de prazo da Taxa Subsidiada (mesma tabela
-  // simulador_get_taxa_botao, mesmo texto copiado). Botão só aparece
-  // quando a tabela carregou e tem taxa para aquele prazo.
+  // Wave 2 (19/10/2026): o "Copiar taxa banco" é um ícone pequeno no canto
+  // superior direito de cada cartão de prazo da Taxa Subsidiada (mesma
+  // tabela simulador_get_taxa_botao, mesmo texto copiado), visível só para
+  // Analista e Master (mesma regra ANALISTA_OR_MASTER do auth-core). Só
+  // aparece quando a tabela carregou e tem taxa para aquele prazo.
+  function podeCopiarTaxa() {
+    var ctx = (window.NX_AUTH_CORE && typeof window.NX_AUTH_CORE.getContext === 'function') ? window.NX_AUTH_CORE.getContext() : null;
+    var p = String((ctx && ctx.perfil) || '').trim().toUpperCase();
+    return !!ctx && (ctx.isMaster === true || p === 'MASTER' || p === 'ANALISTA');
+  }
+  var ICONE_COPIAR = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 3.5v-.5A1.5 1.5 0 0 0 9 1.5H4A1.5 1.5 0 0 0 2.5 3v5A1.5 1.5 0 0 0 4 9.5h.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
   function bankRateButtonHtml(prazo) {
-    if (taxaBotaoAuthority.getState() !== 'READY') return '';
+    if (!podeCopiarTaxa() || taxaBotaoAuthority.getState() !== 'READY') return '';
     var mapa = taxaBotaoAuthority.getAuthority() || {};
     if (mapa[prazo] == null) return '';
-    return '<div class="smCopyTaxaBox"><button type="button" class="btn btn-secondary btn-sm smCopyTaxaBtn" data-copy-prazo="' + prazo + '">Copiar taxa banco</button>' +
-      '<span class="smCopyTaxaMsg" role="status" aria-live="polite"></span></div>';
+    return '<button type="button" class="smCopyTaxaIcon" data-copy-prazo="' + prazo + '" title="Copiar taxa banco" aria-label="Copiar taxa banco do prazo ' + prazo + 'x">' + ICONE_COPIAR + '</button>';
+  }
+  // Aviso curto no rodapé da tela, some sozinho.
+  var avisoTimer = null;
+  function avisoCurto(texto) {
+    var el = document.getElementById('smToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'smToast'; el.className = 'smToast'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite');
+      document.body.appendChild(el);
+    }
+    el.textContent = texto;
+    el.classList.add('show');
+    clearTimeout(avisoTimer);
+    avisoTimer = setTimeout(function () { el.classList.remove('show'); }, 2200);
   }
   function formatTaxaBancoCopy(v) {
     return (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + '%';
@@ -280,16 +300,17 @@
       var btn = ev.target && ev.target.closest && ev.target.closest('[data-copy-prazo]');
       if (!btn) return;
       ev.stopPropagation();
-      copiarTaxaBanco(btn.getAttribute('data-copy-prazo'), btn.parentElement.querySelector('.smCopyTaxaMsg'));
+      copiarTaxaBanco(btn.getAttribute('data-copy-prazo'));
     });
   }
-  function copiarTaxaBanco(prazo, msg) {
+  function copiarTaxaBanco(prazo) {
+    if (!podeCopiarTaxa()) return;
     var mapa = taxaBotaoAuthority.getAuthority() || {};
     var taxa = mapa[Number(prazo)];
-    if (taxa == null) { if (msg) msg.textContent = 'Taxa do banco indisponível para este prazo.'; return; }
+    if (taxa == null) { avisoCurto('Taxa do banco indisponível para este prazo.'); return; }
     var texto = formatTaxaBancoCopy(taxa);
-    var done = function () { if (msg) msg.textContent = 'Taxa ' + texto + ' copiada!'; };
-    var fail = function () { if (msg) msg.textContent = 'Não foi possível copiar automaticamente. Taxa: ' + texto; };
+    var done = function () { avisoCurto('Taxa copiada'); };
+    var fail = function () { avisoCurto('Não foi possível copiar. Taxa: ' + texto); };
     try {
       if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(texto).then(done, fail);
@@ -309,7 +330,7 @@
   // Carrega a tabela do "Copiar taxa banco" em segundo plano; quando chega,
   // redesenha os cartões já abertos para mostrar os botões.
   function ensureBankRates() {
-    if (taxaBotaoAuthority.getState() !== 'IDLE') return;
+    if (!podeCopiarTaxa() || taxaBotaoAuthority.getState() !== 'IDLE') return;
     var redesenha = function () {
       if (currentMode === 'subsidiadas' && document.querySelector('#smResultRegion .smSubsidiadaCard')) calcSubsidiadas();
     };
@@ -1156,7 +1177,7 @@
         if (row.melhor) pill = '<span class="smPill excellent">Melhor opção</span>';
         else if (r.minVenda > 0) pill = '<span class="smPill ' + (row.viavel ? 'good' : 'bad') + '">' + (row.viavel ? 'Dentro do mínimo' : 'Abaixo do mínimo') + '</span>';
         return '<div class="smSubsidiadaCard' + (row.melhor ? ' best' : '') + '">' +
-          '<div class="smSubsidiadaCardHead"><span class="smSubsidiadaCardPrazo">' + row.prazo + 'x</span><span class="smSubsidiadaCardTaxa">' + UI.rateBadge(row.taxa) + '</span></div>' +
+          '<div class="smSubsidiadaCardHead"><span class="smSubsidiadaCardPrazo">' + row.prazo + 'x</span><span class="smSubsidiadaCardTaxa">' + UI.rateBadge(row.taxa) + '</span>' + bankRateButtonHtml(row.prazo) + '</div>' +
           (pill ? '<div class="smSubsidiadaCardPill">' + pill + '</div>' : '') +
           '<div class="smSubsidiadaCardRow"><span class="kpiLabel">Parcela</span><strong>' + UI.brl(row.parcela) + '</strong></div>' +
           // Gate 1-3 (PORTAL-NEXT-08.4): row.rebate is the engine's own
@@ -1168,7 +1189,6 @@
           '<span class="smSubsidiadaCardValueStack"><strong>' + UI.brl(row.rebateValor) + '</strong>' +
           '<span class="smSubsidiadaCardRebatePct">' + UI.pct2(row.rebate) + ' do valor financiado</span></span></div>' +
           '<div class="smSubsidiadaCardRow smSubsidiadaCardRowEmphasis"><span class="kpiLabel">Valor final de venda</span><strong>' + UI.brl(row.valorFinalVenda) + '</strong></div>' +
-          bankRateButtonHtml(row.prazo) +
           '</div>';
       }).join('');
       return '<div class="smSubsidiadaGroup"><div class="smResultHead"><p class="kpiLabel">Prazos</p><p class="smSubsidiadaGroupHead">' + UI.rateBadge(Number(taxa), true) + '</p></div><div class="smSubsidiadaGrid smSubsGrid4">' + cards + '</div></div>';
