@@ -42,6 +42,15 @@
   // O snapshot guarda o share na escala 0-100 (100 = 100%) em todos os fechamentos; a célula
   // de % do Excel espera fração (1 = 100%). Só apresentação: o valor gravado não muda.
   function shareFracao(v) { return num(v) / 100; }
+  // CPF gravado pelo fechamento (a partir de 21/10/2026, pelo identificador da pessoa no
+  // cadastro). Fechamentos anteriores não têm CPF: a célula fica vazia.
+  function fmtCpf(v) {
+    var d = String(v || '').replace(/\D/g, '');
+    return d.length === 11 ? d.slice(0, 3) + '.' + d.slice(3, 6) + '.' + d.slice(6, 9) + '-' + d.slice(9) : '';
+  }
+  // Auditoria SPF: true/false gravado pelo fechamento (R$ 1,00 = marcador NBS, fora da comissão).
+  // Fechamentos anteriores a 21/10/2026 não têm a informação: célula vazia.
+  function simNao(v) { return v === true ? 'Sim' : (v === false ? 'Não' : ''); }
   // Ordenação campo a campo (Loja, Departamento, Nome...), em português e sem diferenciar
   // maiúsculas/acentos -- concatenar os campos misturava "Loja A"+"Novos" com "Loja AB".
   function porCampos(campos) {
@@ -147,12 +156,12 @@
   }
 
   // ---------- ABA 2 -- Vendedores / ABA 4 -- Gerentes (mesmo shape) ----------
-  // CPF sempre vazio nesta linha por padrão -- ver nota de proveniência no
-  // topo do arquivo (comportamento real do V1 em modo seguro, não uma
-  // omissão do V2).
+  // CPF: a partir de 21/10/2026 o fechamento grava o CPF do cadastro (pelo identificador
+  // da pessoa). Fechamentos anteriores não têm CPF no snapshot -- a célula fica vazia
+  // (ver nota de proveniência no topo do arquivo).
   function linhaPadrao(r) {
     return {
-      'Nome': r.nome || '', 'CPF': '', 'Loja': r.loja || '', 'Departamento': r.departamento || '',
+      'Nome': r.nome || '', 'CPF': fmtCpf(r.cpf), 'Loja': r.loja || '', 'Departamento': r.departamento || '',
       'Vendas': num(r.vendidas), 'Financiamentos': num(r.financiadas), 'Share': shareFracao(r.share),
       'Retorno': num(r.retorno), '70% SPF': num(r.spf_liquido), 'Retorno + 70% SPF': num(r.rentabilidade_total),
       'Faixa de Comissão': num(r.faixa), 'Comissão Total': num(r.comissao_total)
@@ -181,7 +190,7 @@
         var qtdSpf = isGestor ? 0 : Math.round(num(r.comissao_spf) / 150);
         var valorUnitario = isGestor ? 0 : 150;
         return {
-          'Nome': r.nome || '', 'CPF': '', 'Cargo': r.perfil || '', 'Loja': r.loja || '', 'Departamento': r.departamento || '',
+          'Nome': r.nome || '', 'CPF': fmtCpf(r.cpf), 'Cargo': r.perfil || '', 'Loja': r.loja || '', 'Departamento': r.departamento || '',
           'Vendas': num(r.vendidas), 'Financiamentos': num(r.financiadas), 'Share': shareFracao(r.share),
           'Retorno': num(r.retorno), '70% SPF': num(r.spf_liquido), 'Retorno + 70% SPF': num(r.rentabilidade_total),
           'Faixa de Comissão': num(r.faixa), 'Quantidade de SPF': qtdSpf, 'Valor Unitário SPF': valorUnitario,
@@ -228,7 +237,8 @@
         'Loja': r.store || '', 'Vendedor': r.seller_name || '', 'Departamento': r.department || '',
         'Data': r.operation_date || '', 'Chassi': r.chassis_masked || '', 'Código da Operação': r.operation_code || '',
         'Banco': r.bank || '', 'Plano Financeiro': r.finance_code || '', 'Opcional': r.optional_name || '',
-        'Valor SPF Bruto': num(r.spf_bruto), 'Valor SPF 70%': num(r.spf_liquido)
+        'Valor SPF Bruto': num(r.spf_bruto), 'Valor SPF 70%': num(r.spf_liquido),
+        'Conta na comissão': simNao(r.conta_na_comissao)
       };
     });
   }
@@ -288,7 +298,7 @@
           store: r.store, department: r.department, seller_user_id: r.seller_user_id, seller_name: r.seller_name,
           operation_date: r.operation_date, chassis_masked: r.chassis_masked, operation_code: r.operation_code,
           bank: r.bank, finance_code: r.finance_code, optional_name: r.optional_name,
-          spf_bruto: r.spf_bruto, spf_liquido: r.spf_liquido
+          spf_bruto: r.spf_bruto, spf_liquido: r.spf_liquido, conta_na_comissao: r.conta_na_comissao
         });
       } else {
         ok = false;

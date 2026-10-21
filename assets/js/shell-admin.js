@@ -4765,7 +4765,7 @@
     // LEGACY_PARTIAL (Gate 34: "Se não for possível determinar
     // COMPLETE/LEGACY: BLOCK. Não assumir LEGACY.").
     var normalizedRows, spfRows, chassisRows, rawSnapshotRows;
-    HC_PROVIDER.exportSnapshot(closingId, {})
+    HC_PROVIDER.exportSnapshot(closingId, { manterCpf: true })
       .then(function (rawRows) {
         rawSnapshotRows = rawRows;
         normalizedRows = rawRows.map(HC_VM.normalizeSnapshotRowExato);
@@ -5299,10 +5299,15 @@
         ? '<div class="modErrorState"><div class="modStateTitle">Fechamento não concluído</div>' + esc(closingState.closeError.message) + '</div>'
         : errorStateHtml(closingState.closeError.state, closingState.closeError.message))
       : '';
+    // 21/10/2026: o fechamento grava quem é cada pessoa pelo identificador do cadastro. Linha sem
+    // identificador (ex.: dois gerentes na mesma loja/departamento) fecha normalmente, com CPF vazio.
+    var semId = p.linhas.filter(function (l) { return !l.usuario_id; }).length;
+    var semIdHtml = semId ? '<p class="note gbWarn">' + semId + ' linha(s) sem identificação no cadastro — o CPF dessas pessoas ficará vazio no RH/DP.</p>' : '';
     return '<div class="gbRow"><span>Competência</span><b>' + esc(periodo.nome_periodo || '-') + '</b></div>' +
       '<div class="gbRow"><span>Período</span><b>' + esc(CL_VM.fmtDateBR(periodo.data_inicio)) + ' → ' + esc(CL_VM.fmtDateBR(periodo.data_fim)) + '</b></div>' +
       '<div class="gbRow"><span>Linhas do snapshot</span><b>' + p.linhas.length + '</b></div>' +
       '<div class="gbRow"><span>Comissão total prevista</span><b>' + esc(CL_VM.fmtMoney(p.comissaoPrevista)) + '</b></div>' +
+      semIdHtml +
       modoTxt +
       '<p class="note">Após confirmar, um snapshot histórico será criado e esta competência será marcada como FECHADO. Uma competência fechada pode ser reaberta depois, na tela Histórico de Competências.</p>' +
       errHtml +

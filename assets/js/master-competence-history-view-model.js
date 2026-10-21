@@ -184,6 +184,7 @@
     var t = commissionTotals(r);
     return {
       loja: r.loja || '', perfil: r.perfil || '', nome: r.nome || '', departamento: r.departamento || '',
+      cpf: r.cpf || '',
       vendidas: Number(r.vendidas) || 0, financiadas: Number(r.financiadas) || 0, share: Number(r.share) || 0,
       producao: round2(r.producao), retorno: round2(r.retorno), spf_extra: round2(r.spf_extra),
       spf_liquido: round2(r.spf_liquido), rentabilidade_total: round2(r.rentabilidade_total), faixa: Number(r.faixa) || 0,
