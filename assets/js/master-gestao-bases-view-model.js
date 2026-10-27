@@ -57,6 +57,9 @@
     if (typeof v === 'number') return isFinite(v) ? v : 0;
     var s = String(v).trim().replace('R$', '').trim();
     if (!s) return 0;
+    // Só ponto de milhar, sem decimais ("179.990", "1.250.000"): é milhar, não decimal. Em 07/08/2026 uma carga leu
+    // "179.990" como 179,99 (835 vendas em milhares). Um único ponto com 1 ou 2 casas ("179.99") continua decimal.
+    if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ''));
     var lastComma = s.lastIndexOf(',');
     var lastDot = s.lastIndexOf('.');
     if (lastComma > -1 && lastDot > -1) {
