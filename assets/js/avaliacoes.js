@@ -412,31 +412,47 @@
     html += '<div class="avCard"><p class="kpiLabel">FIPE ' + esc((r && r.fipe && r.fipe.mes_ref) || a.fipe_mes_ref || '') + ' ' + badgeSimulado(a.fipe_simulado) + '</p>' +
       '<p class="avValor">' + brl(a.fipe_valor) + '</p>' +
       '<p class="avNota">' + (a.fipe_codigo ? 'Código ' + esc(a.fipe_codigo) : 'Sem consulta de placa: FIPE não informada.') + '</p></div>';
-    var vg = r && r.vendas_grupo;
-    html += '<div class="avCard"><p class="kpiLabel">Vendas do grupo · 12 meses</p>';
+    html += '</div>';
     if (d.carregandoRefs) {
-      html += '<p class="avNota">Carregando…</p>';
-    } else if (vg && vg.quantidade > 0) {
-      html += '<p class="avValor">' + brl(vg.mediana) + '</p><p class="avNota">mediana de ' + esc(vg.quantidade) + ' venda' + (vg.quantidade > 1 ? 's' : '') +
-        (vg.quantidade < 5 ? ' · <b>amostra pequena</b>' : '') + '</p>' +
-        '<p class="avNota">Metade das vendas entre ' + brl(vg.p25) + ' e ' + brl(vg.p75) + ' · menor ' + brl(vg.minimo) + ' · maior ' + brl(vg.maximo) +
-        ' · última em ' + data(vg.ultima_venda) + '</p>';
-    } else {
-      html += '<p class="avNota">Nenhuma venda encontrada para este termo.</p>';
+      html += '<div class="avCard"><p class="avNota">Buscando vendas do grupo…</p></div>';
+    } else if (r) {
+      var b = r.base || {};
+      html += '<p class="avNota avBase">Vendas do grupo (12 meses) parecidas com: <b>' +
+        esc([b.familia, b.motor, b.versao, (b.edicao || []).join(' '), b.combustivel, b.tracao].filter(Boolean).join(' · ')) +
+        '</b> · ano-modelo ' + esc(b.ano_modelo) + ' (±1)</p>';
+      html += '<div class="avRefs">' + grupoHtml('Mesma versão e ano', r.mesma_versao_ano, r.amostra_pequena_abaixo_de) +
+        grupoHtml('Versão ou ano próximo', r.versao_ou_ano_proximo, r.amostra_pequena_abaixo_de) + '</div>';
+      if (r.ignoradas > 0) {
+        html += '<p class="avNota">' + esc(r.ignoradas) + ' venda' + (r.ignoradas > 1 ? 's ignoradas' : ' ignorada') + ' por valor absurdo' +
+          (r.ignoradas_milhares ? ' (' + esc(r.ignoradas_milhares) + ' lançada' + (r.ignoradas_milhares > 1 ? 's' : '') + ' em milhares na carga histórica' +
+            (r.ignoradas_fora_da_faixa ? '; ' + esc(r.ignoradas_fora_da_faixa) + ' fora da faixa' : '') + ')' :
+            (r.ignoradas_fora_da_faixa ? ' (fora da faixa)' : '')) + '.</p>';
+      }
     }
-    html += '</div></div>';
-    html += '<div class="avCard"><label class="avLabel" for="avTermo">Buscar vendas do grupo pelo modelo (como aparece no NBS)</label>' +
-      '<div class="avBuscaTermo"><input id="avTermo" class="avInput" value="' + esc((r && r.termo) || a.termo_referencia || a.modelo || '') + '" autocapitalize="characters">' +
+    html += '<div class="avCard"><label class="avLabel" for="avTermo">Buscar como (modelo e versão)</label>' +
+      '<div class="avBuscaTermo"><input id="avTermo" class="avInput" value="' + esc((r && r.termo) || a.termo_referencia || [a.modelo, a.versao].filter(Boolean).join(' ')) + '" autocapitalize="characters">' +
       '<button type="button" class="btn btn-secondary" data-acao="buscarRefs"' + (d.carregandoRefs ? ' disabled' : '') + '>Buscar</button></div>' +
       '<p class="avNota">' + esc((r && r.observacao) || '') + '</p>';
-    if (r && r.ultimas_vendas && r.ultimas_vendas.length) {
-      html += '<ul class="avVendas">' + r.ultimas_vendas.map(function (v) {
-        return '<li><span class="avVendaQuando">' + esc(data(v.data)) + ' · ' + esc(v.loja) + '</span><b>' + brl(v.valor) + '</b><span class="avVendaModelo">' + esc(v.modelo) + '</span></li>';
+    if (r && r.vendas && r.vendas.length) {
+      html += '<ul class="avVendas">' + r.vendas.map(function (v) {
+        var tag = v.ignorada ? '<span class="avTag ign">ignorada</span>' : (v.grupo === 'mesma' ? '<span class="avTag mesma">mesma</span>' : '<span class="avTag">próxima</span>');
+        return '<li' + (v.ignorada ? ' class="avIgn"' : '') + '><span class="avVendaQuando">' + tag + esc(data(v.data)) + ' · ' + esc(v.loja) + ' · ' + esc(v.ano || '—') + '</span><b>' + brl(v.valor) + '</b><span class="avVendaModelo">' + esc(v.modelo) + '</span></li>';
       }).join('') + '</ul>';
+    } else if (r) {
+      html += '<p class="avNota">Nenhuma venda parecida nos últimos 12 meses.</p>';
     }
     html += '</div>';
     html += '<div class="avProximas">Próximas fases: vistoria com avarias e fotos (Fase 2); resultado com os 4 valores e aprovação do gerente (Fase 3).</div>';
     return html;
+  }
+  function grupoHtml(titulo, g, minimo) {
+    g = g || {};
+    var n = g.quantidade || 0;
+    var h = '<div class="avCard"><p class="kpiLabel">' + titulo + '</p>';
+    if (!n) return h + '<p class="avValor avValorVazio">—</p><p class="avNota">Nenhuma venda.</p></div>';
+    return h + '<p class="avValor">' + brl(g.mediana) + '</p><p class="avNota">mediana de ' + n + ' venda' + (n > 1 ? 's' : '') +
+      (g.amostra_pequena ? ' · <b class="avAviso">amostra pequena (menos de ' + esc(minimo || 5) + ')</b>' : '') + '</p>' +
+      '<p class="avNota">Metade entre ' + brl(g.p25) + ' e ' + brl(g.p75) + ' · menor ' + brl(g.minimo) + ' · maior ' + brl(g.maximo) + '</p></div>';
   }
   function dd(k, v) { return '<div><dt>' + k + '</dt><dd>' + esc(v) + '</dd></div>'; }
 

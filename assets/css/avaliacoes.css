@@ -112,3 +112,13 @@ textarea.avInput { min-height: 64px; resize: vertical; }
 .avQuatroItem .avValor { font-size: 1.125rem; }
 .avVersoesRegra { list-style: none; padding: 0; margin: var(--space-2) 0 0; }
 .avVersoesRegra li { padding: 10px 0; border-top: 1px solid var(--color-hairline-strong); font-size: 0.8125rem; color: var(--color-text-secondary); display: flex; flex-direction: column; gap: 2px; }
+
+/* referências por versão (27/10) */
+.avBase { margin-top: var(--space-3); }
+.avValorVazio { color: var(--color-text-muted); }
+.avAviso { color: #f0c64a; }
+.avTag { display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 4px; font-size: 0.625rem; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--color-hairline-strong); color: var(--color-text-muted); }
+.avTag.mesma { border-color: rgba(58, 201, 120, .55); color: #7fdca6; }
+.avTag.ign { border-color: rgba(238, 75, 87, .5); color: #ff8a93; }
+.avVendas li.avIgn { opacity: .55; }
+.avVendas li.avIgn b { text-decoration: line-through; }
