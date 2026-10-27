@@ -489,7 +489,6 @@
   // - Veículos: operational_model_metrics (out.modelMetricsRows); a soma é conferida contra as vendas da
   //   loja e, se não bater, a lista mostra um aviso (nunca esconde a diferença).
   var LISTA_NS = 'storeLists';
-  function vendidosTxt(n) { return n + (n === 1 ? ' vendido' : ' vendidos'); }
   function ordenaContagem(mapa) {
     return Object.keys(mapa).map(function (k) { return { nome: k, qtd: mapa[k] }; })
       .sort(function (a, b) { return (b.qtd - a.qtd) || a.nome.localeCompare(b.nome, 'pt-BR'); });
@@ -516,15 +515,21 @@
     });
     return ordenaContagem(mapa);
   }
-  function listaHtml(titulo, itens, totalLoja) {
+  // Cabeçalho "Modelo | Qtd" / "Vendedor | Qtd"; cada linha só o número, com uma barrinha proporcional
+  // (a maior linha = barra cheia); Total com o mesmo destaque do cabeçalho.
+  function listaHtml(titulo, colNome, itens, totalLoja) {
     var total = itens.reduce(function (s, x) { return s + x.qtd; }, 0);
+    var max = itens.reduce(function (m, x) { return Math.max(m, x.qtd); }, 0);
     var aviso = total !== totalLoja
       ? '<div class="dbListaAviso">Total diferente das vendas da loja (' + totalLoja + '); conferir a base.</div>' : '';
     return '<div class="dbLista"><div class="dbListaTitulo">' + esc(titulo) + '</div>' +
+      '<div class="dbListaCab"><span>' + esc(colNome) + '</span><span>Qtd</span></div>' +
       (itens.length ? '<ol class="dbListaItens">' + itens.map(function (x) {
-        return '<li><span class="dbListaNome">' + esc(x.nome) + '</span><span class="dbListaQtd">' + esc(vendidosTxt(x.qtd)) + '</span></li>';
+        var pct = max ? Math.round(x.qtd / max * 1000) / 10 : 0;
+        return '<li><span class="dbListaNome">' + esc(x.nome) + '</span><span class="dbListaQtd">' + x.qtd + '</span>' +
+          '<span class="dbListaBarra" aria-hidden="true"><span style="width:' + pct + '%"></span></span></li>';
       }).join('') + '</ol>' : '<p class="dbMuted">Sem vendas no período.</p>') +
-      '<div class="dbListaTotal"><span>Total</span><span class="dbListaQtd">' + esc(vendidosTxt(total)) + '</span></div>' + aviso + '</div>';
+      '<div class="dbListaTotal"><span>Total</span><span class="dbListaQtd">' + total + '</span></div>' + aviso + '</div>';
   }
   function listaBtnHtml(chave, rotulo) {
     var open = isExpanded(LISTA_NS, chave);
@@ -538,9 +543,11 @@
     var html = '<div class="dbListaDept"><div class="dbListaDeptHead"><span class="dbListaDeptNome">' + esc(dept.toUpperCase()) + ' — ' +
       esc(totalLoja + (totalLoja === 1 ? ' venda' : ' vendas')) + '</span><span class="dbListaBtns">' +
       botoes.map(function (b) { return listaBtnHtml(base + b[0], b[1]); }).join('') + '</span></div>';
-    if (isExpanded(LISTA_NS, base + 'veiculos') && dept === 'Novos') html += listaHtml('Veículos vendidos', listaVeiculos(listasOut, loja), totalLoja);
-    if (isExpanded(LISTA_NS, base + 'vendedores')) html += listaHtml('Vendedores', listaVendedores(listasOut, loja, dept), totalLoja);
-    return html + '</div>';
+    var listas = '';
+    if (isExpanded(LISTA_NS, base + 'veiculos') && dept === 'Novos') listas += listaHtml('Veículos vendidos', 'Modelo', listaVeiculos(listasOut, loja), totalLoja);
+    if (isExpanded(LISTA_NS, base + 'vendedores')) listas += listaHtml('Vendedores', 'Vendedor', listaVendedores(listasOut, loja, dept), totalLoja);
+    // lado a lado no computador, um embaixo do outro no celular (.dbListasGrade)
+    return html + (listas ? '<div class="dbListasGrade">' + listas + '</div>' : '') + '</div>';
   }
   function storeListsHtml(listasOut, loja) {
     if (!listasOut) return '';
