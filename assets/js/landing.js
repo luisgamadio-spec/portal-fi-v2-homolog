@@ -54,6 +54,7 @@
     { label: 'Visão Geral', moduleIds: ['dashbi', 'gestao'] },
     { label: 'Remuneração', moduleIds: ['score', 'coparticipado', 'salarios-comissoes'] },
     { label: 'Simuladores', moduleIds: ['simulador-novos', 'simulador-seminovos'] },
+    { label: 'Seminovos', moduleIds: ['avaliacoes'] },
     { label: 'Administração', moduleIds: ['shell-admin'] }
   ];
 

@@ -1,0 +1,114 @@
+/* PORTAL-NEXT V2 — Avaliações de Seminovos (Fase 1).
+   Celular primeiro (pátio): uma coluna, alvos de toque >= 48px, sem rolagem
+   horizontal. Valores só por var() dos tokens, como painel-analista-fi.css.
+   Tudo prefixado com .avPage/.av* para não vazar em outros módulos. */
+
+.avPage { max-width: 760px; padding-bottom: var(--space-6); }
+.avHeader .modHeaderMain { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.avVoltar { padding-left: 0 !important; text-decoration: none !important; }
+
+.avTopo { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-4) 0 var(--space-3); }
+.avBtnGrande { min-height: 52px; font-size: 0.9375rem !important; width: 100%; margin-top: var(--space-3); }
+.avTopo .avBtnGrande { margin-top: 0; flex: 1 1 260px; width: auto; }
+.avPage .btn-tertiary { display: block; margin-top: var(--space-2); }
+
+.avChips { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
+.avChip, .avSegBtn, .avCarr {
+  min-height: 44px; padding: 8px 16px; border-radius: var(--radius-sm);
+  border: 1px solid var(--color-hairline-strong); background: var(--color-surface-2);
+  color: var(--color-text-secondary); font-family: var(--font-ui); font-size: 0.8125rem; cursor: pointer;
+}
+.avChip.active, .avSegBtn.active, .avCarr.active {
+  background: rgba(238, 75, 87, .14); border-color: var(--color-accent-primary); color: var(--color-text-primary);
+}
+
+.avMsg { margin: var(--space-3) 0; padding: 12px 14px; border-radius: var(--radius-sm); font-size: 0.8438rem; border: 1px solid var(--color-hairline-strong); }
+.avMsg.ok { border-color: rgba(58, 201, 120, .45); background: rgba(58, 201, 120, .08); }
+.avMsg.err { border-color: rgba(238, 75, 87, .5); background: rgba(238, 75, 87, .08); }
+.avVazio, .avErro { padding: var(--space-5) var(--space-3); color: var(--color-text-muted); text-align: center; font-size: 0.875rem; }
+.avErro { display: flex; flex-direction: column; gap: var(--space-3); align-items: center; }
+
+/* lista */
+.avLista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.avItem {
+  width: 100%; text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 14px 16px;
+  border-radius: var(--radius-md); border: 1px solid var(--color-hairline-strong); background: var(--color-surface-1);
+  color: var(--color-text-primary); font-family: var(--font-ui); cursor: pointer;
+}
+.avItem:hover { border-color: rgba(238, 75, 87, .4); }
+.avItemTopo { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
+.avItemTopo b, .avPlaca { font-family: var(--font-mono); font-size: 1rem; letter-spacing: .04em; }
+.avItemModelo { font-size: 0.875rem; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.avItemMeta { font-size: 0.75rem; color: var(--color-text-muted); }
+.avStatus { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--color-hairline-strong); color: var(--color-text-secondary); white-space: nowrap; }
+.avStRASCUNHO { border-color: rgba(230, 180, 40, .5); }
+.avStDESCARTADA { color: var(--color-text-muted); }
+
+/* cartões e formulário */
+.avCard { margin-top: var(--space-3); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--color-hairline-strong); background: var(--color-surface-1); }
+.avCardTitulo { margin: 0 0 4px; font-size: 1rem; font-weight: 600; color: var(--color-text-primary); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.avNota { margin: 4px 0 0; font-size: 0.7812rem; color: var(--color-text-muted); overflow-wrap: anywhere; }
+.avLabel { display: block; margin: var(--space-3) 0 4px; font-size: 0.75rem; color: var(--color-text-secondary); }
+.avInput {
+  width: 100%; box-sizing: border-box; min-height: 48px; padding: 10px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--color-hairline-strong); background: var(--color-surface-2); color: var(--color-text-primary);
+  font-family: var(--font-ui); font-size: 1rem; /* 16px: o iOS não dá zoom no campo */
+}
+.avInput:focus { outline: none; border-color: var(--color-accent-primary); box-shadow: var(--focus-ring); }
+.avInput[readonly] { opacity: .75; }
+.avInputGrande { font-family: var(--font-mono); font-size: 1.375rem; letter-spacing: .08em; text-transform: uppercase; text-align: center; }
+textarea.avInput { min-height: 64px; resize: vertical; }
+.avDupla { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.avSeg { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.avCarrocerias { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); }
+@media (max-width: 420px) { .avCarrocerias { grid-template-columns: 1fr 1fr; } }
+.avCarr { min-height: 52px; }
+
+.avPassos { list-style: none; display: flex; gap: var(--space-2); padding: 0; margin: var(--space-3) 0 0; counter-reset: p; }
+.avPassos li { flex: 1; font-size: 0.75rem; color: var(--color-text-muted); padding-top: 6px; border-top: 3px solid var(--color-hairline-strong); counter-increment: p; }
+.avPassos li::before { content: counter(p) ". "; }
+.avPassos li.feito { border-top-color: rgba(238, 75, 87, .45); }
+.avPassos li.atual { border-top-color: var(--color-accent-primary); color: var(--color-text-primary); font-weight: 600; }
+
+.avVersoes { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+.avVersao {
+  text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; min-height: 64px;
+  border-radius: var(--radius-sm); border: 1px solid var(--color-hairline-strong); background: var(--color-surface-2);
+  color: var(--color-text-primary); font-family: var(--font-ui); cursor: pointer;
+}
+.avVersao.active { background: rgba(238, 75, 87, .14); border-color: var(--color-accent-primary); }
+.avVersaoNome { font-weight: 600; font-size: 0.9375rem; }
+.avVersaoDet { font-size: 0.8438rem; color: var(--color-text-secondary); }
+.avVersaoMeta { font-size: 0.75rem; color: var(--color-text-muted); font-family: var(--font-mono); }
+
+.avBadgeSim { font-size: 0.625rem; font-weight: 700; letter-spacing: .08em; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(230, 180, 40, .6); color: #f0c64a; }
+.avRestricoes { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.avRestr { font-size: 0.75rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--color-hairline-strong); color: var(--color-text-secondary); }
+.avRestr.sim { border-color: rgba(238, 75, 87, .6); background: rgba(238, 75, 87, .12); color: var(--color-text-primary); }
+
+/* detalhe */
+.avDados { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--space-2) var(--space-3); margin: var(--space-3) 0 0; }
+.avDados dt { font-size: 0.6875rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.avDados dd { margin: 2px 0 0; font-size: 0.875rem; color: var(--color-text-primary); overflow-wrap: anywhere; }
+.avAcoes { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); align-items: center; }
+.avAcoes .btn-tertiary { margin-top: 0; }
+.avPerigo { color: #ff8a93 !important; }
+.avSecao { font-size: var(--mod-section-title-size); font-weight: 600; margin: var(--space-5) 0 0; color: var(--color-text-primary); }
+.avRefs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 var(--space-3); }
+.avValor { margin: 4px 0 0; font-family: var(--font-mono); font-size: 1.5rem; color: var(--color-text-primary); }
+.avBuscaTermo { display: flex; gap: var(--space-2); }
+.avBuscaTermo .btn { min-height: 48px; flex: 0 0 auto; }
+.avVendas { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
+.avVendas li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--space-2); padding: 8px 0; border-top: 1px solid var(--color-hairline-strong); font-size: 0.7812rem; color: var(--color-text-secondary); }
+.avVendas li b { font-family: var(--font-mono); color: var(--color-text-primary); text-align: right; white-space: nowrap; }
+.avVendaModelo { grid-column: 1 / -1; color: var(--color-text-muted); overflow-wrap: anywhere; }
+.avProximas { margin-top: var(--space-4); font-size: 0.75rem; color: var(--color-text-muted); border-left: 3px solid var(--color-hairline-strong); padding-left: 10px; }
+
+/* regras (Master) */
+.avRegraGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 var(--space-3); }
+.avPreviaTit { margin-top: var(--space-4); }
+.avQuatro { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
+.avQuatroItem { padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--color-hairline-strong); background: var(--color-surface-2); }
+.avQuatroItem .avValor { font-size: 1.125rem; }
+.avVersoesRegra { list-style: none; padding: 0; margin: var(--space-2) 0 0; }
+.avVersoesRegra li { padding: 10px 0; border-top: 1px solid var(--color-hairline-strong); font-size: 0.8125rem; color: var(--color-text-secondary); display: flex; flex-direction: column; gap: 2px; }
