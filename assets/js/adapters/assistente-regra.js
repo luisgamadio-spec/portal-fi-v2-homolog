@@ -1,7 +1,7 @@
 /* GERADO — não editar. Assistente de solução financeira: regra das 3 propostas (Simulador de Novos).
-   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 4d20f3d).
+   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 400cee9).
    Gerador: docs/assistente/gerar_regra_navegador.ts. sha256 das fontes (16 primeiros):
-   engine/assistente.ts baba0084348a38c9
+   engine/assistente.ts 3ef8ab73af9b788c
    engine/novos.ts 341f5dc0aa5382ef
    engine/ofertas.ts 2005d0d02d5ddf4d
    engine/comum.ts 2fd6c72c675cfeb1
@@ -17,9 +17,8 @@
   // supabase/functions/brabus-intelligence/engine/assistente.ts
   var assistente_exports = {};
   __export(assistente_exports, {
-    AVISO_IOF_LINEAR: () => AVISO_IOF_LINEAR,
     CONFIG_PADRAO: () => CONFIG_PADRAO,
-    baseLinearTetoLegal: () => baseLinearTetoLegal,
+    aliquotaIr: () => aliquotaIr,
     cetEstimado: () => cetEstimado,
     montarTresPropostas: () => montarTresPropostas,
     perfilDasRespostas: () => perfilDasRespostas
@@ -335,7 +334,8 @@
   var CONFIG_PADRAO = {
     balao_pct: 0.3,
     limite_renda: 0.3,
-    rendimento_aa: null,
+    cdi_aa: null,
+    ir_faixas: [],
     campanhas_liberadas: false
   };
   function perfilDasRespostas(r) {
@@ -358,13 +358,12 @@
     }
     return (lo + hi) / 2;
   }
-  var AVISO_IOF_LINEAR = "Parcela calculada com IOF pelo teto legal; pode ficar um pouco abaixo do simulador.";
-  var IOF_BASE = 38e-4;
-  var IOF_DIARIO = 82e-6;
-  var IOF_TETO_DIAS = 365;
-  function baseLinearTetoLegal(fin, prazo, comSeguro) {
-    const fatorIof = IOF_BASE + IOF_DIARIO * Math.min(Math.max(0, prazo) * 30, IOF_TETO_DIAS);
-    return (Math.max(0, fin) * (comSeguro ? 1 + BASE_BALAO.ADICIONAL : 1) + BASE_BALAO.CAD + BASE_BALAO.REG) / (1 - fatorIof);
+  function aliquotaIr(faixas, dias) {
+    const ord = [
+      ...faixas
+    ].sort((a, b) => (a.ate_dias ?? Infinity) - (b.ate_dias ?? Infinity));
+    const f = ord.find((x) => x.ate_dias === null || dias <= x.ate_dias);
+    return f ? f.aliquota_pct / 100 : null;
   }
   var aa = (am) => am === null ? null : Math.pow(1 + am, 12) - 1;
   var ehErro = (x) => !!x && typeof x === "object" && "erro" in x;
@@ -424,8 +423,7 @@
         parcela,
         baloes: bs,
         taxa: sim.taxa,
-        seguro,
-        aviso: null
+        seguro
       }, e.valor));
     }
     return out;
@@ -436,14 +434,13 @@
     if (!ehErro(lin)) {
       for (const it of lin.itens) if (it.parcela && it.taxa !== null) {
         const coef = coefLinear(it.taxa, it.prazo);
-        const parcela = baseLinearTetoLegal(lin.financiado, it.prazo, false) * coef;
-        const comSeguro = baseLinearTetoLegal(lin.financiado, it.prazo, true) * coef;
+        const comSeguro = baseCalculoLinear(lin.financiado * (1 + BASE_BALAO.ADICIONAL), it.prazo) * coef;
         const seguro = {
           produto: "SEGURO_PRESTAMISTA",
-          valor_financiado: baseLinearTetoLegal(lin.financiado, it.prazo, true) - baseLinearTetoLegal(lin.financiado, it.prazo, false),
+          valor_financiado: baseCalculoLinear(lin.financiado * (1 + BASE_BALAO.ADICIONAL), it.prazo) - baseCalculoLinear(lin.financiado, it.prazo),
           parcela_com_seguro: comSeguro,
-          acrescimo_parcela: comSeguro - parcela,
-          acrescimo_total: (comSeguro - parcela) * it.prazo
+          acrescimo_parcela: comSeguro - it.parcela,
+          acrescimo_total: (comSeguro - it.parcela) * it.prazo
         };
         out.push(cand({
           plano: "LINEAR",
@@ -451,11 +448,10 @@
           prazo: it.prazo,
           entrada,
           financiado: lin.financiado,
-          parcela,
+          parcela: it.parcela,
           baloes: [],
           taxa: it.taxa,
-          seguro,
-          aviso: it.prazo * 30 > 365 ? AVISO_IOF_LINEAR : null
+          seguro
         }, e.valor));
       }
     }
@@ -473,8 +469,7 @@
           parcela: l.parcela,
           baloes: [],
           taxa: l.taxa,
-          seguro: null,
-          aviso: null
+          seguro: null
         }, e.valor));
       }
       const nome = casaModelo(e.modelo, e.versao, e.tabelas.copartModels.map((m) => m.name));
@@ -500,8 +495,7 @@
               parcela,
               baloes: [],
               taxa: x.taxa,
-              seguro,
-              aviso: null
+              seguro
             }, e.valor));
           }
         }
@@ -619,7 +613,9 @@
     return resultado(e, cfg, perfil, propostas, todas.length, !base.some(cabe), melhor, melhor);
   }
   function montaProposta(e, r, cfg, cabe, c, coluna, rotulo, destaque) {
-    const rm = cfg.rendimento_aa === null ? null : Math.pow(1 + cfg.rendimento_aa, 1 / 12) - 1;
+    const aliq = cfg.cdi_aa === null ? null : aliquotaIr(cfg.ir_faixas, c.prazo * 30);
+    const rendimento = cfg.cdi_aa === null || aliq === null ? null : cfg.cdi_aa * (1 - aliq);
+    const rm = rendimento === null ? null : Math.pow(1 + rendimento, 1 / 12) - 1;
     const vp = rm === null ? null : c.entrada + c.pagamentos.reduce((s, p) => s + p.valor / Math.pow(1 + rm, p.mes), 0);
     const rendaPct = r.renda && r.renda > 0 ? c.parcela / r.renda : null;
     return {
@@ -642,7 +638,9 @@
         valor: e.valor,
         diferenca_total: c.total_pago - e.valor,
         custo_valor_presente: vp,
-        diferenca_valor_presente: vp === null ? null : vp - e.valor
+        diferenca_valor_presente: vp === null ? null : vp - e.valor,
+        rendimento_aa: rendimento,
+        aliquota_ir: aliq
       },
       alertas: {
         acima_da_parcela_max: !cabe(c),
@@ -650,7 +648,6 @@
         renda_alta: rendaPct !== null && rendaPct > cfg.limite_renda
       },
       seguro: c.seguro,
-      aviso: c.aviso,
       usa_dinheiro_extra: Math.max(0, c.entrada - e.entrada),
       destaque
     };
@@ -661,7 +658,8 @@
       propostas,
       opcoes_avaliadas: avaliadas,
       nenhuma_cabe: nenhumaCabe,
-      a_vista_mais_barata: cfg.rendimento_aa === null ? null : propostas.every((p) => (p.a_vista.custo_valor_presente ?? 0) > e.valor),
+      a_vista_mais_barata: propostas.some((p) => p.a_vista.custo_valor_presente === null) ? null : propostas.every((p) => p.a_vista.custo_valor_presente > e.valor),
+      abaixo_do_a_vista: propostas.filter((p) => p.a_vista.custo_valor_presente !== null && p.a_vista.custo_valor_presente < e.valor).map((p) => p.rotulo),
       diferencas: {
         leve_para_menos_juros: {
           parcela: menosJuros.parcela - ref.parcela,
@@ -675,12 +673,13 @@
         "Se uma op\xE7\xE3o vence nas duas pontas, ela aparece sozinha em destaque, com alternativas de outra estrutura.",
         "Rebate, valor final de venda, retorno e comiss\xE3o n\xE3o entram na escolha. O Plano Bal\xE3o n\xE3o tem prioridade.",
         "Seguro prestamista fora das propostas; oferecido \xE0 parte, com aceite pr\xF3prio do cliente.",
-        "Linear com IOF pelo teto legal de 365 dias (o Simulador n\xE3o limita).",
+        "Linear com o mesmo c\xE1lculo do Simulador.",
+        "Conta \xE0 vista: CDI das Refer\xEAncias de Mercado, l\xEDquido do IR da faixa do prazo de cada proposta.",
         "CET estimado; o oficial vem no contrato do banco."
       ]
     };
   }
 
-  // ../../Users/luis9/AppData/Local/Temp/e609411428f4665e/entrada.ts
+  // ../../Users/luis9/AppData/Local/Temp/2c110ae0ed1733d0/entrada.ts
   globalThis.NX_ASSISTENTE_REGRA = assistente_exports;
 })();

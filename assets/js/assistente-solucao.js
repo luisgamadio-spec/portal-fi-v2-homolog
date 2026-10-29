@@ -1,7 +1,10 @@
 /* Assistente de solução financeira — Simulador de Novos (Fase 2, 30/10/2026; plano e decisões do Luis de 29–30/10).
    - Botão "Encontrar a melhor solução" sempre visível nos planos com valor do bem e entrada; pop-up de reforço depois de N mudanças
      (assist_config.popup_mudancas), no máximo 1 vez por visita ao simulador.
-   - 5 perguntas de toque; o vendedor marca antes se as campanhas estão liberadas para o cliente.
+   - 4 perguntas de toque (31/10: a antiga 5ª, "esse dinheiro rende?", saiu: "tenho, mas prefiro não mexer" já diz isso);
+     o vendedor marca antes se as campanhas estão liberadas para o cliente.
+   - Conta "à vista ou financiar": CDI das Referências de Mercado do Master (cash_referencias_mercado), líquido do IR da faixa
+     do prazo de cada proposta; mostra a data da referência e o nome das propostas que custam menos que pagar à vista.
    - TODOS os números vêm de window.NX_ASSISTENTE_REGRA (gerado de engine/assistente.ts, a mesma regra testada na função) com as
      tabelas vigentes do próprio simulador. Este arquivo não faz conta de financiamento: só formata o que a regra devolve.
    - Seguro prestamista fora das propostas; passo separado com valor, efeito na parcela e aceite próprio do cliente.
@@ -26,9 +29,9 @@
     { id: 'prioridade', q: 'O que pesa mais pra você hoje?', opts: [['parcela', 'Parcela leve no mês'], ['juros', 'Pagar menos juros no total'], ['aplicado', 'Deixar meu dinheiro aplicado'], ['avista', 'Prefiro pagar à vista']] },
     { id: 'faixa', q: 'Qual parcela fica confortável por mês, sem apertar?', opts: FAIXAS.map(function (f) { return [f[0], f[1]]; }) },
     { id: 'troca', q: 'Pretende trocar de carro em 2 ou 3 anos?', opts: [['sim', 'Sim, troco logo'], ['nao', 'Não, vou ficar bastante tempo'], ['nao_sei', 'Ainda não sei']] },
-    { id: 'dinheiro', q: 'Além da entrada, tem algum dinheiro que poderia usar?', opts: [['nao', 'Não'], ['sim', 'Sim'], ['nao_mexer', 'Tenho, mas prefiro não mexer']] },
-    { id: 'rende', q: 'Esse dinheiro hoje rende em aplicação?', opts: [['sim', 'Sim'], ['nao', 'Não'], ['nao_sei', 'Não sei']], so: function (r) { return r.dinheiro === 'sim' || r.dinheiro === 'nao_mexer'; } }
+    { id: 'dinheiro', q: 'Além da entrada, tem algum dinheiro que poderia usar?', opts: [['nao', 'Não'], ['sim', 'Sim'], ['nao_mexer', 'Tenho, mas prefiro deixar aplicado']] }
   ];
+  var TXT_PERGUNTAS = PERGUNTAS.length + ' perguntas rápidas';
   var PERFIL_NOME = { PARCELA: 'Parcela', CUSTO_TOTAL: 'Custo total', LIQUIDEZ: 'Liquidez', A_VISTA: 'À vista' };
 
   // ---------- utilidades ----------
@@ -100,7 +103,7 @@
   function barraHtml() {
     var ok = preenchido();
     return '<div class="asstBar' + (ok ? '' : ' asstBarOff') + '" id="asstBar">' +
-      '<div class="asstBarTxt"><b>Não sabe qual plano oferecer?</b><span>' + (ok ? '5 perguntas rápidas e 3 propostas com os números deste simulador.' : 'Preencha o valor do bem e a entrada para usar.') + '</span></div>' +
+      '<div class="asstBarTxt"><b>Não sabe qual plano oferecer?</b><span>' + (ok ? TXT_PERGUNTAS + ' e até 3 propostas com os números deste simulador.' : 'Preencha o valor do bem e a entrada para usar.') + '</span></div>' +
       '<button type="button" class="btn btn-secondary asstBarBtn" id="asstAbrir"' + (ok ? '' : ' disabled') + '>Encontrar a melhor solução</button></div>';
   }
   function atualizarBarra() {
@@ -109,7 +112,7 @@
     var ok = preenchido();
     bar.classList.toggle('asstBarOff', !ok);
     var btn = document.getElementById('asstAbrir'); if (btn) btn.disabled = !ok;
-    var txt = bar.querySelector('.asstBarTxt span'); if (txt) txt.textContent = ok ? '5 perguntas rápidas e 3 propostas com os números deste simulador.' : 'Preencha o valor do bem e a entrada para usar.';
+    var txt = bar.querySelector('.asstBarTxt span'); if (txt) txt.textContent = ok ? TXT_PERGUNTAS + ' e até 3 propostas com os números deste simulador.' : 'Preencha o valor do bem e a entrada para usar.';
     if (ok) oferecer('botao');
   }
   function contarMudanca() {
@@ -124,7 +127,7 @@
     if (!sessao.oferecido) oferecer('popup');
     var el = document.createElement('div');
     el.className = 'asstPop'; el.id = 'asstPop'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Assistente de solução financeira');
-    el.innerHTML = '<b>Quer ajuda para achar a melhor solução para este cliente?</b><span>5 perguntas rápidas. Os números são deste simulador.</span>' +
+    el.innerHTML = '<b>Quer ajuda para achar a melhor solução para este cliente?</b><span>' + TXT_PERGUNTAS + '. Os números são deste simulador.</span>' +
       '<div class="asstRow"><button type="button" class="btn btn-primary btn-sm" id="asstPopSim">Começar</button><button type="button" class="btn btn-secondary btn-sm" id="asstPopNao">Agora não</button></div>';
     document.body.appendChild(el);
     document.getElementById('asstPopSim').onclick = function () { el.remove(); abrir('popup'); };
@@ -153,10 +156,12 @@
     if (!sessao.oferecido) oferecer(origem);
     registrar('aberto', { origem: origem });
     sessao.aberto = true;
-    st = { passo: 'antes', idx: 0, origem: origem, resp: { prioridade: null, faixa: null, outroValor: '', renda: '', troca: null, dinheiro: null, dinheiroValor: '', rende: null },
+    st = { passo: 'antes', idx: 0, origem: origem, resp: { prioridade: null, faixa: null, outroValor: '', renda: '', troca: null, dinheiro: null, dinheiroValor: '' }, ref: null,
       campanhas: false, modelo: '', tab: null, copart: false, carregando: true, erro: null, res: null, escolha: null, seguroAceito: null, resultado: null };
     montarJanela();
-    pagina.tabelas().then(function (t) { st.tab = t.tabelas; st.copart = t.copart; st.carregando = false; desenhar(); },
+    // Referências de Mercado (Cash Conversion, mantidas pelo Master): sem elas, só a conta à vista some.
+    var ref = rpc('cash_referencias_mercado', {}).then(function (r) { return r && r.cdi_aa ? r : null; }, function () { return null; });
+    Promise.all([pagina.tabelas(), ref]).then(function (x) { var t = x[0]; if (!st) return; st.tab = t.tabelas; st.copart = t.copart; st.ref = x[1]; st.carregando = false; desenhar(); },
       function () { st.carregando = false; st.erro = 'Não foi possível carregar as condições vigentes do simulador. Tente novamente.'; desenhar(); });
   }
   function montarJanela() {
@@ -180,7 +185,7 @@
     document.removeEventListener('keydown', teclaEsc);
     if (!semLimpar) st = null;
   }
-  function perguntasVisiveis() { return PERGUNTAS.filter(function (q) { return !q.so || q.so(st.resp); }); }
+  function perguntasVisiveis() { return PERGUNTAS; }
 
   function desenhar() {
     var body = document.getElementById('asstBody');
@@ -240,14 +245,15 @@
     return {
       prioridade: r.prioridade, parcela_max: pm, renda: parseBRL(r.renda) || null, troca: r.troca,
       dinheiro: r.dinheiro, dinheiro_extra: r.dinheiro === 'sim' ? parseBRL(r.dinheiroValor) : 0,
-      rende: (r.dinheiro === 'sim' || r.dinheiro === 'nao_mexer') ? r.rende : null
+      rende: r.dinheiro === 'nao_mexer' ? 'sim' : null
     };
   }
   function calcular() {
     var res = REGRA.montarTresPropostas(
       { modelo: st.campanhas ? st.modelo : '', versao: null, valor: pagina.valor(), entrada: pagina.entrada(), tabelas: st.tab },
       respostasRegra(),
-      { balao_pct: cfg.balao_pct, limite_renda: cfg.limite_renda, rendimento_aa: cfg.rendimento_aa, campanhas_liberadas: !!st.campanhas });
+      { balao_pct: cfg.balao_pct, limite_renda: cfg.limite_renda, campanhas_liberadas: !!st.campanhas,
+        cdi_aa: st.ref ? Number(st.ref.cdi_aa) / 100 : null, ir_faixas: st.ref && Array.isArray(st.ref.ir_faixas) ? st.ref.ir_faixas : [] });
     st.res = res;
     if (res && !res.erro) {
       registrar('concluido', {
@@ -263,7 +269,6 @@
     var avisos = '';
     if (p.usa_dinheiro_extra > 0) avisos += '<div class="asstNota info">Usa ' + brl0(p.usa_dinheiro_extra) + ' do dinheiro extra que o cliente disse ter, para chegar à entrada mínima da campanha.</div>';
     if (p.taxa_am === 0) avisos += '<div class="asstNota info">Taxa 0% com CET estimado de ' + pct(p.cet_aa) + ' a.a. por IOF e tarifas. Se houver desconto para pagar à vista, compare com o preço à vista.</div>';
-    if (p.aviso) avisos += '<div class="asstNota">' + esc(p.aviso) + '</div>';
     if (p.alertas.acima_da_parcela_max) avisos += '<div class="asstNota warn">Acima da parcela confortável que o cliente disse.</div>';
     if (p.alertas.renda_alta) avisos += '<div class="asstNota warn">Esta parcela passa de ' + pct(cfg.limite_renda).replace(',00', '') + ' da renda informada (' + pct(p.alertas.renda_pct) + '). Vale conferir com o cliente se cabe com folga.</div>';
     var av = p.a_vista;
@@ -293,14 +298,24 @@
     var topo = res.perfil === 'A_VISTA' ? '<div class="asstAvista"><b>Pagar à vista: ' + brl0(pagina.valor()) + '</b><span>É a opção mais barata para este cliente. As propostas abaixo ficam como comparação, caso ele queira manter parte do dinheiro.</span>' +
       '<button type="button" class="btn btn-secondary btn-sm" data-escolher="avista">Cliente vai pagar à vista</button></div>' : '';
     var conta = '';
-    if (cfg.rendimento_aa != null && (res.perfil === 'LIQUIDEZ' || res.perfil === 'A_VISTA' || r.rende === 'sim')) {
-      var lista = res.propostas.map(function (p) { return esc(p.rotulo) + ': ' + brl0(p.a_vista.custo_valor_presente); }).join(' · ');
-      var difs = res.propostas.map(function (p) { return p.a_vista.diferenca_valor_presente; });
+    if (st.ref && res.a_vista_mais_barata !== null && (res.perfil === 'LIQUIDEZ' || res.perfil === 'A_VISTA' || r.dinheiro === 'sim' || r.dinheiro === 'nao_mexer')) {
+      var dataRef = String(st.ref.vigencia || '').split('-').reverse().join('/');
+      var lista = res.propostas.map(function (p) { return esc(p.rotulo) + ': ' + brl0(p.a_vista.custo_valor_presente) + ' (CDI líquido ' + pct(p.a_vista.rendimento_aa) + ')'; }).join(' · ');
+      var frase;
+      if (res.abaixo_do_a_vista.length) {
+        var abaixo = res.propostas.filter(function (p) { return res.abaixo_do_a_vista.indexOf(p.rotulo) >= 0; });
+        frase = abaixo.length === 1
+          ? '<b>' + esc(abaixo[0].rotulo) + '</b> custa ' + brl0(-abaixo[0].a_vista.diferenca_valor_presente) + ' menos que pagar à vista, em dinheiro de hoje.'
+          : abaixo.map(function (p) { return '<b>' + esc(p.rotulo) + '</b> (' + brl0(-p.a_vista.diferenca_valor_presente) + ' abaixo)'; }).join(' e ') + ' custam menos que pagar à vista, em dinheiro de hoje.';
+      } else {
+        var perto = res.propostas.slice().sort(function (a, b) { return a.a_vista.diferenca_valor_presente - b.a_vista.diferenca_valor_presente; })[0];
+        frase = 'Nenhuma proposta custa menos que pagar à vista. A mais próxima é <b>' + esc(perto.rotulo) + '</b>, ' + brl0(perto.a_vista.diferenca_valor_presente) + ' acima em dinheiro de hoje.';
+      }
       conta = '<div class="asstConta"><b>À vista ou financiar e deixar o dinheiro aplicado?</b>' +
-        '<span>Com o rendimento de referência de ' + pct(cfg.rendimento_aa) + ' a.a. (CDI líquido de IR, configurado pelo Master), cada proposta custa em dinheiro de hoje:</span>' +
+        '<span>CDI de ' + pct(Number(st.ref.cdi_aa) / 100) + ' a.a. das Referências de Mercado de ' + esc(dataRef) + (st.ref.desatualizada ? ' (referência com mais de 50 dias)' : '') +
+        ', líquido do IR da faixa do prazo de cada proposta. Custo de cada uma em dinheiro de hoje:</span>' +
         '<span class="asstMono">' + lista + '</span>' +
-        (res.a_vista_mais_barata ? '<span>Pagando à vista: <b>' + brl0(pagina.valor()) + '</b>. Pagar à vista sai mais barato que qualquer proposta, em ' + brl0(Math.min.apply(null, difs)) + ' a ' + brl0(Math.max.apply(null, difs)) + '.</span>'
-          : '<span>Pagando à vista: <b>' + brl0(pagina.valor()) + '</b>. Alguma proposta custa menos que pagar à vista em dinheiro de hoje.</span>') + '</div>';
+        '<span>Pagando à vista: <b>' + brl0(pagina.valor()) + '</b>. ' + frase + '</span></div>';
     }
     var d = res.diferencas.leve_para_menos_juros, explica = '';
     if (res.propostas.length >= 2 && d.parcela > 0) explica = '<p class="asstExplica">Da opção de parcela mais leve para a de menos juros, a parcela sobe ' + brl(d.parcela) + ' por mês e o total pago cai ' + brl(d.total_pago) + '.</p>';
