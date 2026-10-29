@@ -1,9 +1,11 @@
-/* PORTAL-NEXT V2 — Avaliações de Seminovos (Fase 1, 27/10/2026).
+/* PORTAL-NEXT V2 — Avaliações de Seminovos (Fase 1, 27/10/2026; vistoria da Fase 2, 28/10/2026).
    Uso principal no celular, no pátio: uma coluna, botões grandes.
    Fase 1: identificação (placa/chassi -> versões -> ano, km, cor, carroceria),
    referências (FIPE + vendas reais do grupo) e, só para o Master, as regras de
-   margem em versões com prévia do cálculo. Vistoria (Fase 2) e resultado com os
-   4 valores + aprovação (Fase 3) ainda não existem nesta tela.
+   margem em versões com prévia do cálculo. Fase 2: vistoria com o carro 3D
+   (avaliacoes-vistoria.mjs), avarias por peça, fotos e checklist, com rascunho no
+   celular para funcionar sem sinal; tabela de reparos em versões (Master).
+   Resultado com os 4 valores + aprovação (Fase 3) ainda não existe nesta tela.
 
    Zero regra de negócio aqui: acesso, loja, validações e o cálculo ficam no
    servidor (RPCs aval_*). Acesso ao módulo: PERMISSION_MATRIX 'avaliacoes'. */
@@ -38,7 +40,7 @@
     return {
       view: 'lista', carregando: true, erro: null, msg: null, ocupado: false,
       ctx: null, lista: [], filtro: '',
-      nova: null, detalhe: null, regras: null
+      nova: null, detalhe: null, regras: null, vis: null
     };
   }
 
@@ -93,9 +95,12 @@
   }
 
   function abrirDetalhe(id) {
-    S.view = 'detalhe'; S.detalhe = { av: null, refs: null, carregandoRefs: true }; S.msg = null; render();
+    // voltando da vistoria (talvez sem sinal), mantém a avaliação já carregada enquanto atualiza
+    var mesma = S.detalhe && S.detalhe.av && S.detalhe.av.id === id ? S.detalhe : null;
+    S.view = 'detalhe'; S.detalhe = { av: mesma ? mesma.av : null, refs: mesma ? mesma.refs : null, vis: mesma ? mesma.vis : null, carregandoRefs: !mesma }; S.msg = null; render();
     return P().obter(id).then(function (av) {
       S.detalhe.av = av; render();
+      P().vistoria(id).then(function (v) { if (S.detalhe && S.detalhe.av && S.detalhe.av.id === id) { S.detalhe.vis = v; if (S.view === 'detalhe') render(); } }).catch(noop);
       return P().referencias(id, null);
     }).then(function (refs) {
       S.detalhe.refs = refs; S.detalhe.carregandoRefs = false; render();
@@ -118,6 +123,7 @@
       S.regras.form = {};
       REGRA_CAMPOS.forEach(function (c) { S.regras.form[c.k] = vig[c.k] == null ? '' : String(vig[c.k]); });
       render();
+      return P().reparos().then(function (t) { if (S.regras) { S.regras.reparos = t || []; render(); } });
     }).catch(falha);
   }
 
@@ -405,6 +411,8 @@
         '<button type="button" class="btn btn-tertiary avPerigo" data-acao="descartar">Descartar</button></div>' : '') +
       '</div>';
 
+    html += cardVistoriaHtml();
+
     // referências
     var r = d.refs;
     html += '<h2 class="avSecao">Referências</h2>';
@@ -442,7 +450,7 @@
       html += '<p class="avNota">Nenhuma venda parecida nos últimos 12 meses.</p>';
     }
     html += '</div>';
-    html += '<div class="avProximas">Próximas fases: vistoria com avarias e fotos (Fase 2); resultado com os 4 valores e aprovação do gerente (Fase 3).</div>';
+    html += '<div class="avProximas">Próxima fase: resultado com os 4 valores e aprovação do gerente (Fase 3).</div>';
     return html;
   }
   function grupoHtml(titulo, g, minimo) {
@@ -494,12 +502,492 @@
         '<span class="avNota">' + REGRA_CAMPOS.map(function (c) { return c.label + ': ' + (par[c.k] == null ? 'a definir' : esc(par[c.k]) + (c.suf === '%' ? '%' : '')); }).join(' · ') + '</span>' +
         (r.observacao ? '<span class="avNota">' + esc(r.observacao) + '</span>' : '') + '</li>';
     }).join('') + '</ul>';
+    html += tabelaReparosHtml();
     return html;
+  }
+
+  // ================================================================ vistoria (Fase 2)
+  // Carro 3D (avaliacoes-vistoria.mjs) + avarias por peça, fotos comprimidas no celular, checklist.
+  // Rascunho no próprio celular (IndexedDB): sem sinal, tudo continua funcionando e é enviado depois
+  // (avarias e checklist pelo estado inteiro, fotos uma a uma; os ids vêm do celular, então reenviar não duplica).
+  var GRAVIDADES = [['LEVE', 'Leve'], ['MEDIA', 'Média'], ['GRAVE', 'Grave']];
+  var GRAV_LABEL = { LEVE: 'Leve', MEDIA: 'Média', GRAVE: 'Grave' };
+  var GRAV_ORDEM = { LEVE: 1, MEDIA: 2, GRAVE: 3 };
+  var TIPOS_AVARIA = {
+    lataria: ['Risco', 'Amassado', 'Pintura danificada', 'Repintura', 'Ferrugem'],
+    'para-choque': ['Risco', 'Amassado', 'Trinca/quebra', 'Pintura danificada', 'Repintura'],
+    vidro: ['Risco', 'Trinca/quebra'],
+    farol: ['Trinca/quebra', 'Embaçado/infiltração', 'Opaco/amarelado', 'Faltando'],
+    grade: ['Risco', 'Trinca/quebra', 'Faltando'],
+    roda: ['Risco', 'Empeno', 'Faltando'],
+    pneu: ['Desgaste', 'Corte/bolha', 'Remendo', 'Faltando'],
+    retrovisor: ['Risco', 'Trinca/quebra', 'Faltando'],
+    estrutura: ['Amassado', 'Trinca/solda', 'Repintura']
+  };
+  var GRUPO_LABEL = { lataria: 'Lataria', 'para-choque': 'Para-choque', vidro: 'Vidro', farol: 'Farol/lanterna', grade: 'Grade',
+    roda: 'Roda', pneu: 'Pneu', retrovisor: 'Retrovisor', estrutura: 'Estrutura' };
+  var CHECKLIST = [
+    ['interior', 'Interior (bancos, forros, carpete)', [['BOM', 'Bom'], ['REGULAR', 'Regular'], ['RUIM', 'Ruim']]],
+    ['luzes_painel', 'Luzes de alerta no painel', [['NENHUMA', 'Nenhuma'], ['ACESAS', 'Acesa(s)']]],
+    ['ar_condicionado', 'Ar-condicionado', [['GELA', 'Gela'], ['FRACO', 'Fraco'], ['NAO_FUNCIONA', 'Não funciona']]],
+    ['chave_reserva', 'Chave reserva', [['TEM', 'Tem'], ['NAO_TEM', 'Não tem']]],
+    ['manual', 'Manual do proprietário', [['TEM', 'Tem'], ['NAO_TEM', 'Não tem']]],
+    ['revisoes', 'Revisões', [['EM_DIA', 'Em dia na concessionária'], ['PARCIAIS', 'Parciais'], ['SEM_COMPROVACAO', 'Sem comprovação']]]
+  ];
+  var VISTAS_3D = ['3D', 'Frente', 'Traseira', 'Lat. esq.', 'Lat. dir.', 'Teto'];
+  var ITENS_REPARO = ['Porta', 'Para-lama', 'Capô', 'Teto', 'Tampa', 'Lateral traseira / caçamba', 'Caçamba (assoalho)', 'Para-choque',
+    'Coluna', 'Para-brisa', 'Vidro traseiro', 'Vidro lateral', 'Farol', 'Lanterna', 'Grade', 'Retrovisor', 'Roda', 'Pneu'];
+
+  function noop() {}
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    var b = new Uint8Array(16); crypto.getRandomValues(b); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+    var h = Array.prototype.map.call(b, function (x) { return (x + 256).toString(16).slice(1); }).join('');
+    return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  }
+
+  // ---------- rascunho no celular (IndexedDB)
+  var IDB = (function () {
+    var abrir = null;
+    function db() {
+      if (!abrir) {
+        abrir = new Promise(function (res, rej) {
+          if (!window.indexedDB) { rej(new Error('Sem armazenamento local.')); return; }
+          var r = indexedDB.open('nx-avaliacoes', 1);
+          r.onupgradeneeded = function () {
+            var d = r.result;
+            if (!d.objectStoreNames.contains('rascunhos')) d.createObjectStore('rascunhos', { keyPath: 'id' });
+            if (!d.objectStoreNames.contains('fotos')) d.createObjectStore('fotos', { keyPath: 'id' }).createIndex('avaliacao', 'avaliacao_id');
+          };
+          r.onsuccess = function () { res(r.result); };
+          r.onerror = function () { abrir = null; rej(r.error); };
+        });
+      }
+      return abrir;
+    }
+    function tx(loja, modo, fn) {
+      return db().then(function (d) {
+        return new Promise(function (res, rej) {
+          var t = d.transaction(loja, modo), pedido = fn(t.objectStore(loja)), out;
+          if (pedido) pedido.onsuccess = function () { out = pedido.result; };
+          t.oncomplete = function () { res(out); };
+          t.onerror = t.onabort = function () { rej(t.error); };
+        });
+      });
+    }
+    return {
+      get: function (loja, k) { return tx(loja, 'readonly', function (s) { return s.get(k); }); },
+      put: function (loja, v) { return tx(loja, 'readwrite', function (s) { return s.put(v); }); },
+      del: function (loja, k) { return tx(loja, 'readwrite', function (s) { return s.delete(k); }); },
+      fotos: function (avId) { return tx('fotos', 'readonly', function (s) { return s.index('avaliacao').getAll(avId); }); }
+    };
+  })();
+
+  // ---------- foto: reduz para no máximo 1600 px e JPEG ~70% (cerca de 200–400 KB)
+  function comprimirFoto(arquivo) {
+    var ler = window.createImageBitmap
+      ? createImageBitmap(arquivo, { imageOrientation: 'from-image' }).catch(function () { return createImageBitmap(arquivo); })
+      : new Promise(function (res, rej) { var i = new Image(); i.onload = function () { res(i); }; i.onerror = rej; i.src = URL.createObjectURL(arquivo); });
+    return ler.then(function (img) {
+      var MAX = 1600, w = img.width, h = img.height, k = Math.min(1, MAX / Math.max(w, h));
+      var c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      var gerar = function (q) { return new Promise(function (res) { c.toBlob(res, 'image/jpeg', q); }); };
+      return gerar(0.72).then(function (b) { return b && b.size > 1900000 ? gerar(0.5) : b; });
+    }).then(function (b) {
+      if (!b) throw new Error('Não foi possível ler a foto.');
+      return b;
+    });
+  }
+
+  // ---------- estado da vistoria
+  function estadoLocal(V) { return { id: V.id, avarias: V.avarias, checklist: V.checklist, sujo: V.sujo, carroceria: V.carroceria, pode: V.pode, quando: Date.now() }; }
+  function doServidor(est) {
+    return (est.avarias || []).map(function (a) {
+      return { id: a.id, peca: a.peca, grupo: a.grupo, tipo: a.tipo, gravidade: a.gravidade, observacao: a.observacao || '' };
+    });
+  }
+  function abrirVistoria() {
+    var av = S.detalhe && S.detalhe.av; if (!av) return;
+    fecharVistoria();
+    S.view = 'vistoria'; S.msg = null;
+    var V = S.vis = { id: av.id, av: av, carregando: true, avarias: [], checklist: {}, servidor: null, sujo: false, seq: 0,
+                      pode: false, carroceria: av.carroceria, offline: false, salvando: null, fotosLocais: {}, urls: {},
+                      folha: null, ctrl: null, erro3d: null, montado: false, vista: '3D' };
+    render();
+    Promise.all([
+      P().vistoria(av.id).catch(function (e) { return { _erro: e }; }),
+      IDB.get('rascunhos', av.id).catch(function () { return null; }),
+      IDB.fotos(av.id).catch(function () { return []; })
+    ]).then(function (r) {
+      if (S.vis !== V) return;
+      var srv = r[0], local = r[1];
+      (r[2] || []).forEach(function (f) { V.fotosLocais[f.id] = { avaria_id: f.avaria_id, url: URL.createObjectURL(f.blob) }; });
+      if (srv && srv._erro) {
+        if (srv._erro.state === 'SESSION_EXPIRED') return falha(srv._erro);
+        if (!(srv._erro.rede && local)) { V.carregando = false; S.msg = { erro: true, texto: srv._erro.message }; render(); return; }
+        // sem sinal, mas com rascunho neste celular: continua dele
+        V.offline = true; V.pode = local.pode; V.carroceria = local.carroceria || V.carroceria;
+        V.avarias = local.avarias || []; V.checklist = local.checklist || {}; V.sujo = !!local.sujo;
+      } else {
+        V.servidor = srv; V.pode = !!srv.pode_editar; V.carroceria = srv.carroceria || V.carroceria;
+        if (local && local.sujo && V.pode) { V.avarias = local.avarias || []; V.checklist = local.checklist || {}; V.sujo = true; }
+        else { V.avarias = doServidor(srv); V.checklist = srv.checklist || {}; }
+      }
+      V.carregando = false; render();
+      carregarFotosServidor(V);
+      if (V.sujo || Object.keys(V.fotosLocais).length) sincronizar();
+    });
+  }
+  function fecharVistoria() {
+    var V = S.vis; if (!V) return;
+    if (V.ctrl) { try { V.ctrl.destruir(); } catch (e) { /* já destruído */ } }
+    Object.keys(V.fotosLocais).forEach(function (k) { URL.revokeObjectURL(V.fotosLocais[k].url); });
+    clearTimeout(V.timer);
+    S.vis = null;
+  }
+  function carregarFotosServidor(V) {
+    if (V.offline || !V.servidor) return;
+    P().verFotos(V.id).then(function (r) {
+      if (S.vis !== V) return;
+      (r && r.fotos || []).forEach(function (f) { if (f.url) V.urls[f.id] = f.url; });
+      atualizarVistoria();
+    }).catch(noop);
+  }
+  function montar3d(V) {
+    var palco = document.getElementById('avVisPalco');
+    var api = window.NX_AVALIACOES_VISTORIA;
+    if (!palco) return;
+    if (!api) { V.erro3d = 'O desenho 3D não carregou. Recarregue a página.'; atualizarVistoria(); return; }
+    V.montando = true;
+    api.criar(palco, { carroceria: V.carroceria, aoTocar: function (nome, grupo) { abrirFolhaAvaria(nome, grupo); } }).then(function (ctrl) {
+      V.montando = false;
+      if (S.vis !== V || !palco.isConnected) { ctrl.destruir(); return; }
+      V.ctrl = ctrl; V.erro3d = null; pintar3d(); if (V.vista !== '3D') ctrl.vista(V.vista);
+    }).catch(function () { V.montando = false; V.erro3d = 'O desenho 3D não carregou (sem sinal?). A lista de avarias continua funcionando.'; atualizarVistoria(); });
+  }
+  function pintar3d() {
+    var V = S.vis; if (!V || !V.ctrl) return;
+    var m = {};
+    V.avarias.forEach(function (a) { if (!m[a.peca] || GRAV_ORDEM[a.gravidade] > GRAV_ORDEM[m[a.peca]]) m[a.peca] = a.gravidade; });
+    V.ctrl.marcar(m);
+    V.ctrl.destacar(V.folha ? V.folha.peca : null);
+  }
+
+  // ---------- alterações (sempre: grava no celular e agenda o envio)
+  function alterou() {
+    var V = S.vis; V.seq++; V.sujo = true;
+    IDB.put('rascunhos', estadoLocal(V)).catch(noop);
+    clearTimeout(V.timer); V.timer = setTimeout(sincronizar, 1200);
+    pintar3d(); atualizarVistoria();
+  }
+  function sincronizar() {
+    var V = S.vis;
+    if (!V || !V.pode) return Promise.resolve();
+    if (V.salvando) { V.denovo = true; return V.salvando; }
+    if (navigator.onLine === false) { V.offline = true; atualizarVistoria(); return Promise.resolve(); }
+    var seq = V.seq, enviar = { avarias: V.avarias, checklist: V.checklist };
+    V.erroSync = null;
+    var p = (V.sujo ? P().salvarVistoria(V.id, enviar).then(function (est) {
+      V.servidor = est; V.offline = false;
+      if (V.seq === seq) { V.sujo = false; IDB.put('rascunhos', estadoLocal(V)).catch(noop); }
+    }) : Promise.resolve()).then(function () {
+      return enviarFotosPendentes(V);
+    }).catch(function (e) {
+      if (e && e.state === 'SESSION_EXPIRED') { falha(e); return; }
+      if (e && e.rede) V.offline = true; else V.erroSync = (e && e.message) || 'Não foi possível salvar agora.';
+    }).then(function () {
+      V.salvando = null; if (S.vis === V) atualizarVistoria();
+      if (V.denovo) { V.denovo = false; return sincronizar(); }
+    });
+    V.salvando = p; atualizarVistoria();
+    return p;
+  }
+  function enviarFotosPendentes(V) {
+    return IDB.fotos(V.id).then(function (lista) {
+      var salvas = {}; ((V.servidor && V.servidor.avarias) || []).forEach(function (a) { salvas[a.id] = true; });
+      var fila = (lista || []).filter(function (f) { return !f.avaria_id || salvas[f.avaria_id]; });
+      var enviou = 0;
+      return fila.reduce(function (cad, f) {
+        return cad.then(function () {
+          return P().enviarFoto(V.id, f.avaria_id, f.id, f.blob).then(function () {
+            enviou++;
+            return IDB.del('fotos', f.id).then(function () {
+              if (V.fotosLocais[f.id]) { V.urls[f.id] = V.fotosLocais[f.id].url; delete V.fotosLocais[f.id]; }
+            });
+          });
+        });
+      }, Promise.resolve()).then(function () {
+        if (!enviou) return;
+        V.offline = false;
+        return P().vistoria(V.id).then(function (est) { V.servidor = est; });
+      });
+    });
+  }
+
+  // ---------- folha da avaria (abre ao tocar na peça)
+  function abrirFolhaAvaria(peca, grupo) {
+    var V = S.vis; if (!V) return;
+    V.folha = { peca: peca, grupo: grupo, tipo: null, gravidade: 'LEVE', fotos: [] };
+    pintar3d(); atualizarVistoria();
+  }
+  function fecharFolha() {
+    var V = S.vis; if (!V || !V.folha) return;
+    V.folha.fotos.forEach(function (f) { URL.revokeObjectURL(f.url); });
+    V.folha = null; pintar3d(); atualizarVistoria();
+  }
+  function salvarFolha() {
+    var V = S.vis, f = V.folha; if (!f || !f.tipo) return;
+    var obs = (document.getElementById('avVisObs') || {}).value || '';
+    var a = { id: uuid(), peca: f.peca, grupo: f.grupo, tipo: f.tipo, gravidade: f.gravidade, observacao: obs.trim().slice(0, 300) };
+    V.avarias.push(a);
+    f.fotos.forEach(function (ft) { guardarFoto(V, a.id, ft.id, ft.blob, ft.url); });
+    f.fotos = []; V.folha = null;
+    alterou();
+  }
+  function guardarFoto(V, avariaId, fotoId, blob, url) {
+    V.fotosLocais[fotoId] = { avaria_id: avariaId, url: url || URL.createObjectURL(blob) };
+    IDB.put('fotos', { id: fotoId, avaliacao_id: V.id, avaria_id: avariaId, blob: blob, criado: Date.now() }).catch(function () {
+      S.msg = { erro: true, texto: 'Este celular não conseguiu guardar a foto. Libere espaço e tente de novo.' }; atualizarVistoria();
+    });
+  }
+  function removerAvaria(id) {
+    var V = S.vis;
+    if (!window.confirm('Remover esta avaria e as fotos dela?')) return;
+    V.avarias = V.avarias.filter(function (a) { return a.id !== id; });
+    Object.keys(V.fotosLocais).forEach(function (k) {
+      if (V.fotosLocais[k].avaria_id === id) { URL.revokeObjectURL(V.fotosLocais[k].url); delete V.fotosLocais[k]; IDB.del('fotos', k).catch(noop); }
+    });
+    alterou();
+  }
+  function fotoEscolhida(input) {
+    var V = S.vis, arq = input.files && input.files[0], alvo = input.getAttribute('data-foto');
+    input.value = '';
+    if (!V || !arq) return;
+    S.msg = null;
+    comprimirFoto(arq).then(function (blob) {
+      if (S.vis !== V) return;
+      var id = uuid();
+      if (alvo === 'folha') {
+        if (V.folha) V.folha.fotos.push({ id: id, blob: blob, url: URL.createObjectURL(blob) });
+        atualizarVistoria();
+      } else {
+        guardarFoto(V, alvo, id, blob);
+        atualizarVistoria(); sincronizar();
+      }
+    }).catch(function () { S.msg = { erro: true, texto: 'Não foi possível ler essa foto. Tente tirar de novo.' }; atualizarVistoria(); });
+  }
+  function removerFotoServidor(fotoId) {
+    var V = S.vis;
+    if (!window.confirm('Remover esta foto?')) return;
+    P().removerFoto(fotoId).then(function (est) { V.servidor = est; delete V.urls[fotoId]; atualizarVistoria(); }).catch(falha);
+  }
+  function concluirVistoria() {
+    var V = S.vis;
+    S.msg = null;
+    sincronizar().then(function () {
+      if (V.sujo || Object.keys(V.fotosLocais).length) {
+        S.msg = { erro: true, texto: 'Ainda há alterações ou fotos só neste celular. Espere o sinal voltar para concluir.' }; atualizarVistoria(); return;
+      }
+      return P().concluirVistoria(V.id).then(function (est) {
+        V.servidor = est; S.msg = { erro: false, texto: 'Vistoria concluída.' }; atualizarVistoria();
+      });
+    }).catch(function (e) { S.msg = { erro: true, texto: (e && e.message) || 'Não foi possível concluir.' }; atualizarVistoria(); });
+  }
+
+  // ---------- telas da vistoria
+  function custoDe(id) {
+    var V = S.vis, s = V.servidor && (V.servidor.avarias || []).filter(function (a) { return a.id === id; })[0];
+    if (!s || V.sujo) return '…';
+    return s.custo == null ? 'a definir' : brl(s.custo);
+  }
+  function fotosDaAvaria(id) {
+    var V = S.vis, out = [];
+    var s = V.servidor && (V.servidor.avarias || []).filter(function (a) { return a.id === id; })[0];
+    ((s && s.fotos) || []).forEach(function (f) { if (f.status === 'ENVIADA') out.push({ id: f.id, url: V.urls[f.id], enviada: true }); });
+    Object.keys(V.fotosLocais).forEach(function (k) { if (V.fotosLocais[k].avaria_id === id) out.push({ id: k, url: V.fotosLocais[k].url, enviada: false }); });
+    return out;
+  }
+  function statusVistoriaHtml() {
+    var V = S.vis, pend = Object.keys(V.fotosLocais).length, t;
+    if (V.offline) t = 'Sem sinal: rascunho salvo neste celular' + (pend ? ' · ' + pend + ' foto(s) aguardando' : '') + '. Envia sozinho quando o sinal voltar.';
+    else if (V.salvando) t = 'Salvando…';
+    else if (V.erroSync) t = 'Não salvou: ' + V.erroSync;
+    else if (V.sujo || pend) t = 'Rascunho salvo neste celular' + (pend ? ' · ' + pend + ' foto(s) para enviar' : '') + '.';
+    else t = 'Tudo salvo.';
+    return '<div class="avVisStatus' + (V.offline || V.erroSync ? ' alerta' : '') + '" role="status" aria-live="polite">' + esc(t) + '</div>';
+  }
+  function listaAvariasHtml() {
+    var V = S.vis, est = V.servidor || {};
+    var h = '<h2 class="avSecao avVisSecao"><span>Avarias</span><span class="avNota">' + V.avarias.length + ' marcada(s)' +
+      (V.sujo ? '' : ' · reparos: ' + (est.total_reparos == null ? 'a definir' : brl(est.total_reparos))) + '</span></h2>';
+    if (!V.avarias.length) return h + '<div class="avCard avNota">Nenhuma avaria marcada. Toque na peça do carro para marcar.</div>';
+    return h + '<ul class="avVisLista">' + V.avarias.map(function (a) {
+      var fotos = fotosDaAvaria(a.id), pedeFoto = (a.gravidade === 'MEDIA' || a.gravidade === 'GRAVE') && !fotos.length;
+      return '<li class="avVisItem g' + a.gravidade + '"><div class="avVisItemTopo"><div><b>' + esc(a.peca) + '</b> · ' + esc(a.tipo) +
+        '<span class="avNota">' + esc(GRAV_LABEL[a.gravidade]) + (a.observacao ? ' · ' + esc(a.observacao) : '') + '</span></div>' +
+        '<span class="avVisCusto">' + esc(custoDe(a.id)) + '</span></div>' +
+        (fotos.length ? '<div class="avVisFotos">' + fotos.map(function (f) {
+          return '<span class="avVisFoto' + (f.enviada ? '' : ' pendente') + '">' + (f.url ? '<img src="' + esc(f.url) + '" alt="Foto da avaria">' : '<i>foto</i>') +
+            (f.enviada && V.pode ? '<button type="button" class="avVisFotoX" data-acao="visRemoverFoto" data-id="' + esc(f.id) + '" aria-label="Remover foto">×</button>' : '') + '</span>';
+        }).join('') + '</div>' : '') +
+        (pedeFoto ? '<p class="avNota avAviso">Falta foto (obrigatória em média e grave).</p>' : '') +
+        (V.pode ? '<div class="avAcoes"><label class="btn btn-secondary avVisBtnFoto">📷 Foto<input type="file" accept="image/*" capture="environment" data-foto="' + esc(a.id) + '" hidden></label>' +
+          '<button type="button" class="btn btn-tertiary avPerigo" data-acao="visRemover" data-id="' + esc(a.id) + '">Remover</button></div>' : '') +
+        '</li>';
+    }).join('') + '</ul>';
+  }
+  function checklistHtml() {
+    var V = S.vis;
+    return '<h2 class="avSecao" id="avVisChecklist">Checklist</h2>' + CHECKLIST.map(function (q) {
+      return '<div class="avCard avVisChk"><p class="avVisPerg">' + esc(q[1]) + '</p><div class="avChips">' + q[2].map(function (o) {
+        var on = V.checklist[q[0]] === o[0];
+        return '<button type="button" class="avChip' + (on ? ' active' : '') + '" data-acao="visCheck" data-q="' + q[0] + '" data-v="' + o[0] + '"' +
+          (V.pode ? '' : ' disabled') + ' aria-pressed="' + on + '">' + esc(o[1]) + '</button>';
+      }).join('') + '</div></div>';
+    }).join('');
+  }
+  function folhaHtml() {
+    var V = S.vis, f = V.folha;
+    if (!f) return '';
+    var ja = V.avarias.filter(function (a) { return a.peca === f.peca; });
+    var h = '<div class="avVisFolha" role="dialog" aria-label="' + esc(f.peca) + '"><h3>' + esc(f.peca) + '</h3>' +
+      '<p class="avNota">' + esc(GRUPO_LABEL[f.grupo] || '') + (ja.length ? ' · já tem ' + ja.length + ' avaria(s): ' + esc(ja.map(function (a) { return a.tipo + ' (' + GRAV_LABEL[a.gravidade] + ')'; }).join(', ')) : '') + '</p>';
+    if (!V.pode) return h + '<div class="avVisAcoesFolha um"><button type="button" class="btn btn-secondary" data-acao="visFolhaCancelar">Fechar</button></div></div>';
+    h += '<p class="avLabel">Tipo de avaria</p><div class="avChips">' + (TIPOS_AVARIA[f.grupo] || []).map(function (t) {
+      return '<button type="button" class="avChip' + (f.tipo === t ? ' active' : '') + '" data-acao="visTipo" data-v="' + esc(t) + '" aria-pressed="' + (f.tipo === t) + '">' + esc(t) + '</button>';
+    }).join('') + '</div>' +
+      '<p class="avLabel">Gravidade</p><div class="avChips avVisGrav">' + GRAVIDADES.map(function (g) {
+        return '<button type="button" class="avChip g' + g[0] + (f.gravidade === g[0] ? ' active' : '') + '" data-acao="visGrav" data-v="' + g[0] + '" aria-pressed="' + (f.gravidade === g[0]) + '">' + g[1] + '</button>';
+      }).join('') + '</div>' +
+      '<label class="avLabel" for="avVisObs">Observação (opcional)</label><input id="avVisObs" class="avInput" maxlength="300" autocomplete="off">' +
+      '<p class="avNota">Desconto pela tabela de reparos: <b>a definir</b> até a vistoria salvar.</p>' +
+      '<div class="avVisFotos">' + f.fotos.map(function (ft) { return '<span class="avVisFoto pendente"><img src="' + esc(ft.url) + '" alt="Foto"></span>'; }).join('') +
+      '<label class="btn btn-secondary avVisBtnFoto">📷 Tirar foto<input type="file" accept="image/*" capture="environment" data-foto="folha" hidden></label></div>' +
+      '<p class="avNota">Foto obrigatória em média e grave.</p>' +
+      '<div class="avVisAcoesFolha"><button type="button" class="btn btn-secondary" data-acao="visFolhaCancelar">Cancelar</button>' +
+      '<button type="button" class="btn btn-primary" data-acao="visFolhaSalvar"' + (f.tipo ? '' : ' disabled') + '>Marcar avaria</button></div></div>';
+    return h;
+  }
+  function resumoVistoriaHtml() {
+    var V = S.vis, est = V.servidor || {};
+    var resp = CHECKLIST.filter(function (q) { return V.checklist[q[0]]; }).length;
+    var h = '<div class="avCard"><p class="avNota">Checklist ' + resp + '/' + CHECKLIST.length +
+      (est.avarias_sem_foto && !V.sujo ? ' · ' + est.avarias_sem_foto + ' avaria(s) sem foto' : '') +
+      (est.concluida_em && !V.sujo ? ' · <b>vistoria concluída em ' + esc(data(est.concluida_em)) + '</b>' : '') + '</p>';
+    if (V.pode) h += '<button type="button" class="btn btn-primary avBtnGrande" data-acao="visConcluir"' + (V.salvando ? ' disabled' : '') + '>' +
+      (est.concluida_em && !V.sujo ? 'Concluída · conferir de novo' : 'Concluir vistoria') + '</button>';
+    return h + '</div>';
+  }
+  function telaVistoria() {
+    var V = S.vis, a = V.av;
+    var html = cabecalho('Vistoria' + (a ? ' · AV-' + esc(a.codigo) : ''),
+      esc([placaFmt(a.placa), a.modelo, (CARROCERIAS.filter(function (c) { return c.v === V.carroceria; })[0] || {}).label].filter(Boolean).join(' · ')), 'visVoltar');
+    if (V.carregando) return html + '<div class="avVazio">Carregando a vistoria…</div>';
+    return html + '<div id="avVisMsg">' + msgHtml() + '</div><div id="avVisStatus">' + statusVistoriaHtml() + '</div>' +
+      '<div class="avVisPalco" id="avVisPalco"><div class="avVisLegenda"><span><i class="gLEVE"></i>leve</span><span><i class="gMEDIA"></i>média</span><span><i class="gGRAVE"></i>grave</span></div>' +
+      '<div class="avVisDica">Arraste para girar · toque na peça</div><div id="avVisErro3d" class="avVisErro3d"></div></div>' +
+      '<div class="avVisVistas" role="group" aria-label="Vistas">' + VISTAS_3D.map(function (v) {
+        return '<button type="button" class="avChip' + (V.vista === v ? ' active' : '') + '" data-acao="visVista" data-v="' + v + '">' + v + '</button>';
+      }).join('') + '</div>' +
+      '<div class="avVisExtra"><button type="button" class="btn btn-secondary" data-acao="visEstepe">Pneu estepe</button>' +
+      '<button type="button" class="btn btn-secondary" data-acao="visIrChecklist">Ir para o checklist ↓</button></div>' +
+      '<div id="avVisLista">' + listaAvariasHtml() + '</div><div id="avVisCheck">' + checklistHtml() + '</div>' +
+      '<div id="avVisResumo">' + resumoVistoriaHtml() + '</div><div id="avVisFolha">' + folhaHtml() + '</div>';
+  }
+  // atualiza só as partes da tela (o carro 3D não é recriado)
+  function atualizarVistoria() {
+    var V = S.vis; if (!V || S.view !== 'vistoria') return;
+    if (!document.getElementById('avVisPalco')) { render(); return; }
+    var obs = document.getElementById('avVisObs'), obsValor = obs ? obs.value : null;
+    document.getElementById('avVisMsg').innerHTML = msgHtml();
+    document.getElementById('avVisStatus').innerHTML = statusVistoriaHtml();
+    document.getElementById('avVisLista').innerHTML = listaAvariasHtml();
+    document.getElementById('avVisCheck').innerHTML = checklistHtml();
+    document.getElementById('avVisResumo').innerHTML = resumoVistoriaHtml();
+    document.getElementById('avVisFolha').innerHTML = folhaHtml();
+    document.body.classList.toggle('avVisFolhaAberta', !!V.folha);
+    var novoObs = document.getElementById('avVisObs'); if (novoObs && obsValor != null) novoObs.value = obsValor;
+    document.getElementById('avVisErro3d').textContent = V.erro3d || '';
+    Array.prototype.forEach.call(document.querySelectorAll('.avVisVistas .avChip'), function (b) { b.classList.toggle('active', b.getAttribute('data-v') === V.vista); });
+  }
+  function acaoVistoria(a, b) {
+    var V = S.vis; if (!V) return false;
+    switch (a) {
+      case 'visVoltar': fecharVistoria(); document.body.classList.remove('avVisFolhaAberta'); abrirDetalhe(S.detalhe.av.id); return true;
+      case 'visVista': V.vista = b.getAttribute('data-v'); if (V.ctrl) V.ctrl.vista(V.vista); atualizarVistoria(); return true;
+      case 'visEstepe': abrirFolhaAvaria('Pneu estepe', 'pneu'); return true;
+      case 'visIrChecklist': var c = document.getElementById('avVisChecklist'); if (c) c.scrollIntoView({ behavior: 'smooth' }); return true;
+      case 'visTipo': if (V.folha) { V.folha.tipo = b.getAttribute('data-v'); atualizarVistoria(); } return true;
+      case 'visGrav': if (V.folha) { V.folha.gravidade = b.getAttribute('data-v'); atualizarVistoria(); } return true;
+      case 'visFolhaCancelar': fecharFolha(); return true;
+      case 'visFolhaSalvar': salvarFolha(); return true;
+      case 'visRemover': removerAvaria(b.getAttribute('data-id')); return true;
+      case 'visRemoverFoto': removerFotoServidor(b.getAttribute('data-id')); return true;
+      case 'visCheck': V.checklist[b.getAttribute('data-q')] = b.getAttribute('data-v'); alterou(); return true;
+      case 'visConcluir': concluirVistoria(); return true;
+    }
+    return false;
+  }
+  window.addEventListener('online', function () { if (S && S.vis) { S.vis.offline = false; sincronizar(); } });
+
+  // resumo da vistoria no detalhe da avaliação
+  function cardVistoriaHtml() {
+    var d = S.detalhe, v = d && d.vis, a = d && d.av;
+    if (!a) return '';
+    var h = '<h2 class="avSecao">Vistoria</h2><div class="avCard">';
+    if (!v) return h + '<p class="avNota">Carregando o resumo…</p>' + (a.carroceria ? '<button type="button" class="btn btn-secondary avBtnGrande" data-acao="abrirVistoria">Abrir vistoria</button>' : '') + '</div>';
+    var iniciada = v.avarias.length || Object.keys(v.checklist || {}).length;
+    h += '<p class="avCardTitulo">' + (v.concluida_em ? 'Concluída em ' + esc(data(v.concluida_em)) : iniciada ? 'Em andamento' : 'Não iniciada') + '</p>' +
+      '<p class="avNota">' + v.avarias.length + ' avaria(s) · reparos ' + (v.total_reparos == null ? 'a definir' : brl(v.total_reparos)) +
+      ' · checklist ' + v.checklist_respondidos + '/' + v.checklist_total + '</p>';
+    if (!a.carroceria) return h + '<p class="avNota">Informe a carroceria na identificação para fazer a vistoria.</p></div>';
+    return h + '<button type="button" class="btn btn-primary avBtnGrande" data-acao="abrirVistoria">' +
+      (v.pode_editar ? (iniciada ? 'Continuar vistoria' : 'Fazer vistoria') : 'Ver vistoria') + '</button></div>';
+  }
+
+  // tabela de reparos (Master), na tela de Regras
+  function tabelaReparosHtml() {
+    var R = S.regras, T = R.reparos;
+    var h = '<h2 class="avSecao">Tabela de reparos</h2>';
+    if (!T) return h + '<div class="avVazio">Carregando…</div>';
+    var vig = T[0] || { itens: {} };
+    h += '<div class="avCard"><p class="avNota">Custo de cada reparo por gravidade (R$). Em branco = <b>a definir</b>: a vistoria mostra "a definir" e o total só aparece quando todos os itens marcados tiverem valor. Cada alteração cria uma nova versão (vigente: v' + esc(vig.versao || 1) + ').</p>' +
+      '<div class="avTabRep"><div class="avTabRepCab"><span>Item</span><span>Leve</span><span>Média</span><span>Grave</span></div>' +
+      ITENS_REPARO.map(function (it, i) {
+        var lin = (vig.itens || {})[it] || {};
+        return '<div class="avTabRepLinha"><span>' + esc(it) + '</span>' + GRAVIDADES.map(function (g) {
+          var v = lin[g[0]];
+          return '<input class="avInput" id="avTR_' + i + '_' + g[0] + '" inputmode="decimal" aria-label="' + esc(it + ' ' + g[1]) + '" placeholder="a definir" value="' + (v == null ? '' : esc(String(v).replace('.', ','))) + '">';
+        }).join('') + '</div>';
+      }).join('') + '</div>' +
+      '<label class="avLabel" for="avTR_obs">Observação da versão</label><input id="avTR_obs" class="avInput" placeholder="Ex.: valores da oficina de …">' +
+      '<div class="avAcoes"><button type="button" class="btn btn-primary" data-acao="salvarReparos"' + (S.ocupado ? ' disabled' : '') + '>Salvar nova versão da tabela</button></div></div>';
+    return h;
+  }
+  function salvarReparos() {
+    var itens = {};
+    ITENS_REPARO.forEach(function (it, i) {
+      itens[it] = {};
+      GRAVIDADES.forEach(function (g) { itens[it][g[0]] = val('avTR_' + i + '_' + g[0]).replace(/\./g, '').replace(',', '.').trim() || null; });
+    });
+    if (!window.confirm('Criar uma nova versão da tabela de reparos?')) return;
+    S.ocupado = true; render();
+    P().salvarReparos(itens, val('avTR_obs')).then(function (r) {
+      S.ocupado = false;
+      return P().reparos().then(function (lista) { S.regras.reparos = lista || []; S.msg = { erro: false, texto: 'Versão ' + r.versao + ' da tabela de reparos criada.' }; render(); });
+    }).catch(falha);
   }
 
   // ---------------------------------------------------------------- render + eventos
   function render() {
     if (!outletRef) return;
+    if (S.view === 'vistoria' && S.vis) {
+      // o carro 3D vive dentro do palco: com o palco na tela, só as outras partes são redesenhadas
+      if (document.getElementById('avVisPalco') && (S.vis.ctrl || S.vis.montando)) { atualizarVistoria(); return; }
+      if (S.vis.ctrl) { try { S.vis.ctrl.destruir(); } catch (e) { /* já destruído */ } S.vis.ctrl = null; }
+    }
+    if (S.view !== 'vistoria' && S.vis) { fecharVistoria(); document.body.classList.remove('avVisFolhaAberta'); }
     var corpo;
     if (S.erro) {
       corpo = cabecalho('Avaliações de Seminovos') + '<div class="avErro">' + esc(S.erro) +
@@ -509,8 +997,10 @@
     } else if (S.view === 'nova') corpo = telaNova();
     else if (S.view === 'detalhe') corpo = telaDetalhe();
     else if (S.view === 'regras') corpo = telaRegras();
+    else if (S.view === 'vistoria' && S.vis) corpo = telaVistoria();
     else corpo = telaLista();
     outletRef.innerHTML = '<div class="avPage">' + corpo + '</div>';
+    if (S.view === 'vistoria' && S.vis && !S.vis.carregando) { atualizarVistoria(); montar3d(S.vis); }
     var busca = document.getElementById('avBusca');
     if (busca && S.view === 'nova' && S.nova.etapa === 'busca' && !S.ocupado) {
       busca.addEventListener('keydown', function (e) { if (e.key === 'Enter') consultar(); });
@@ -522,7 +1012,10 @@
     // o outlet é o mesmo de todos os módulos: só reage dentro da página das Avaliações
     if (!b || !b.closest('.avPage') || !outletRef.contains(b) || b.disabled) return;
     var a = b.getAttribute('data-acao');
+    if (S.view === 'vistoria' && acaoVistoria(a, b)) return;
     switch (a) {
+      case 'abrirVistoria': abrirVistoria(); break;
+      case 'salvarReparos': salvarReparos(); break;
       case 'nova': iniciarNova(null); break;
       case 'regras': abrirRegras(); break;
       case 'filtro': S.filtro = b.getAttribute('data-v'); carregarLista(); break;
@@ -546,7 +1039,14 @@
     }
   }
 
+  function onChange(e) {
+    var t = e.target;
+    if (!t || !t.closest || !t.closest('.avPage') || !t.matches('input[type=file][data-foto]')) return;
+    fotoEscolhida(t);
+  }
+
   function iniciar() {
+    if (S && S.vis) fecharVistoria();
     S = novoEstado(); render();
     return P().contexto().then(function (ctx) {
       S.ctx = ctx; return carregarLista();
@@ -561,8 +1061,8 @@
   window.NX_AVALIACOES_PAGE = {
     getState: function () { return S; },
     render: function (outlet) {
-      if (outletRef && outletRef !== outlet) outletRef.removeEventListener('click', onClick);
-      if (outletRef !== outlet) outlet.addEventListener('click', onClick);
+      if (outletRef && outletRef !== outlet) { outletRef.removeEventListener('click', onClick); outletRef.removeEventListener('change', onChange); }
+      if (outletRef !== outlet) { outlet.addEventListener('click', onClick); outlet.addEventListener('change', onChange); }
       outletRef = outlet;
       return iniciar();
     }

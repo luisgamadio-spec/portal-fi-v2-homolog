@@ -122,3 +122,63 @@ textarea.avInput { min-height: 64px; resize: vertical; }
 .avTag.ign { border-color: rgba(238, 75, 87, .5); color: #ff8a93; }
 .avVendas li.avIgn { opacity: .55; }
 .avVendas li.avIgn b { text-decoration: line-through; }
+
+/* vistoria (Fase 2, 28/10): carro 3D + avarias, fotos e checklist. O palco é sempre escuro (o desenho foi
+   aprovado assim); a folha da avaria fica presa embaixo, com altura máxima e botões sempre visíveis. */
+.avVisStatus { margin: var(--space-2) 0; font-size: 0.75rem; color: var(--color-text-muted); }
+.avVisStatus.alerta { color: #f0c64a; }
+.avVisPalco { position: relative; height: 44vh; min-height: 300px; margin: 0 calc(-1 * var(--space-3)); touch-action: none;
+  background: radial-gradient(ellipse at 50% 62%, #26282d 0%, #111214 72%); border-radius: var(--radius-md); overflow: hidden; }
+.avVisCanvas { display: block; width: 100%; height: 100%; }
+.avVisDica { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 0.75rem; color: #a3a3ad; pointer-events: none; }
+.avVisLegenda { position: absolute; top: 8px; left: 10px; display: flex; gap: 10px; font-size: 0.6875rem; color: #a3a3ad; pointer-events: none; }
+.avVisLegenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.avVisLegenda i.gLEVE, .avVisItem.gLEVE { --g: #f5c518; }
+.avVisLegenda i.gMEDIA, .avVisItem.gMEDIA { --g: #ff8c1a; }
+.avVisLegenda i.gGRAVE, .avVisItem.gGRAVE { --g: #e3262f; }
+.avVisLegenda i { background: var(--g); }
+.avVisErro3d:not(:empty) { position: absolute; inset: 40% 16px auto; text-align: center; font-size: 0.8125rem; color: #f0c64a; }
+.avVisVistas { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: var(--space-2); }
+.avVisVistas .avChip { padding: 8px 2px; font-size: 0.75rem; }
+@media (max-width: 420px) { .avVisVistas { grid-template-columns: repeat(3, 1fr); } }
+.avVisExtra { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-top: var(--space-2); }
+.avVisExtra .btn { min-height: 44px; }
+.avVisSecao { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+.avVisLista { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.avVisItem { padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid var(--color-hairline-strong); border-left: 4px solid var(--g, var(--color-hairline-strong));
+  background: var(--color-surface-1); font-size: 0.8438rem; color: var(--color-text-primary); }
+.avVisItemTopo { display: flex; justify-content: space-between; gap: var(--space-2); }
+.avVisItemTopo .avNota { display: block; }
+.avVisCusto { font-family: var(--font-mono); color: var(--color-text-secondary); white-space: nowrap; }
+.avVisFotos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-2); align-items: center; }
+.avVisFoto { position: relative; width: 64px; height: 64px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--color-hairline-strong); background: var(--color-surface-2); }
+.avVisFoto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avVisFoto i { font-size: 0.6875rem; color: var(--color-text-muted); display: grid; place-items: center; height: 100%; }
+.avVisFoto.pendente { border-style: dashed; border-color: #f0c64a; }
+.avVisFoto.pendente::after { content: 'no celular'; position: absolute; left: 0; right: 0; bottom: 0; font-size: 0.5625rem; text-align: center; background: rgba(0, 0, 0, .6); color: #f0c64a; }
+.avVisFotoX { position: absolute; top: 2px; right: 2px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .65); color: #fff; cursor: pointer; line-height: 1; }
+.avVisBtnFoto { min-height: 44px; display: inline-flex; align-items: center; cursor: pointer; }
+.avVisChk { padding: 12px 14px; }
+.avVisPerg { margin: 0 0 6px; font-size: 0.8438rem; color: var(--color-text-primary); }
+.avVisChk .avChips { margin-bottom: 0; }
+.avVisGrav .avChip.gLEVE.active { border-color: #f5c518; background: rgba(245, 197, 24, .18); }
+.avVisGrav .avChip.gMEDIA.active { border-color: #ff8c1a; background: rgba(255, 140, 26, .18); }
+.avVisGrav .avChip.gGRAVE.active { border-color: #e3262f; background: rgba(227, 38, 47, .2); }
+body.avVisFolhaAberta .avPage { padding-bottom: 62vh; }
+.avVisFolha { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; max-height: min(78vh, 560px); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--color-surface-1); border-top: 1px solid var(--color-hairline-strong); border-radius: 16px 16px 0 0;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -12px 40px rgba(0, 0, 0, .45); }
+@media (min-width: 800px) { .avVisFolha { left: 50%; right: auto; width: 560px; transform: translateX(-50%); } }
+.avVisFolha h3 { margin: 0 0 2px; font-size: 1.0625rem; color: var(--color-text-primary); }
+.avVisAcoesFolha { position: sticky; bottom: calc(-16px - env(safe-area-inset-bottom)); display: grid; grid-template-columns: 1fr 2fr; gap: var(--space-2);
+  margin-top: var(--space-3); padding: 8px 0 4px; background: var(--color-surface-1); }
+.avVisAcoesFolha.um { grid-template-columns: 1fr; }
+.avVisAcoesFolha .btn { min-height: 48px; }
+.avVisAcoesFolha .btn[disabled] { opacity: .45; }
+
+/* tabela de reparos (Master) */
+.avTabRep { margin-top: var(--space-3); }
+.avTabRepCab, .avTabRepLinha { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); gap: 6px; align-items: center; }
+.avTabRepCab { font-size: 0.6875rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: .06em; padding-bottom: 4px; }
+.avTabRepLinha { padding: 4px 0; border-top: 1px solid var(--color-hairline-strong); font-size: 0.8125rem; color: var(--color-text-secondary); }
+.avTabRepLinha .avInput { min-height: 40px; padding: 6px 8px; font-family: var(--font-mono); }

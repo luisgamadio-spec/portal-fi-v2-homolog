@@ -1,8 +1,10 @@
-/* PORTAL-NEXT V2 — Avaliações de Seminovos: provider (Fase 1).
+/* PORTAL-NEXT V2 — Avaliações de Seminovos: provider (Fase 1 + vistoria da Fase 2).
    Transporte fino, mesmo padrão dos outros providers reais: chama as RPCs
    aval_* (SECURITY DEFINER; perfil, loja e módulo 'avaliacoes' conferidos no
    servidor a cada chamada) e a Edge Function avaliacao-consulta-placa (a chave
-   do fornecedor só existe lá). Nenhuma regra de negócio aqui. */
+   do fornecedor só existe lá). Nenhuma regra de negócio aqui.
+   Fotos da vistoria: Edge Function avaliacao-fotos (bucket privado; só ela lê e grava).
+   Falha de rede vem marcada com rede:true (a tela guarda o rascunho e reenvia depois). */
 (function () {
   'use strict';
 
@@ -14,7 +16,7 @@
     return 'BACKEND_ERROR';
   }
 
-  function request(path, body) {
+  function request(path, body, tipoBinario) {
     var cfg = window.NX_INTELLIGENCE_CONFIG || {};
     if (!cfg.supabaseUrl || !cfg.supabasePublishableKey) {
       return Promise.reject({ state: 'BACKEND_ERROR', message: 'Configuração real ausente neste ambiente.' });
@@ -26,8 +28,8 @@
       if (!token) return Promise.reject({ state: 'SESSION_EXPIRED', message: 'Sessão expirada.' });
       return fetch(cfg.supabaseUrl + path, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': cfg.supabasePublishableKey, 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify(body || {})
+        headers: { 'Content-Type': tipoBinario || 'application/json', 'apikey': cfg.supabasePublishableKey, 'Authorization': 'Bearer ' + token },
+        body: tipoBinario ? body : JSON.stringify(body || {})
       }).then(function (resp) {
         return resp.json().catch(function () { return null; }).then(function (b) {
           if (!resp.ok) {
@@ -41,7 +43,7 @@
           return b;
         });
       }, function () {
-        return Promise.reject({ state: 'BACKEND_ERROR', message: 'Sem conexão. Confira o sinal e tente de novo.' });
+        return Promise.reject({ state: 'BACKEND_ERROR', rede: true, message: 'Sem conexão. Confira o sinal e tente de novo.' });
       });
     });
   }
@@ -62,6 +64,20 @@
     salvarRegra: function (parametros, observacao) { return rpc('aval_master_salvar_regra', { p_parametros: parametros, p_observacao: observacao || '' }); },
     previa: function (venda, preparacao, reparos, parametros) {
       return rpc('aval_previa_calculo', { p_venda: venda, p_preparacao: preparacao, p_reparos: reparos || 0, p_parametros: parametros || null });
-    }
+    },
+    // vistoria (Fase 2)
+    vistoria: function (id) { return rpc('aval_vistoria_obter', { p_id: id }); },
+    salvarVistoria: function (id, estado) { return rpc('aval_vistoria_salvar', { p_id: id, p_estado: estado }); },
+    concluirVistoria: function (id) { return rpc('aval_vistoria_concluir', { p_id: id }); },
+    removerFoto: function (fotoId) { return rpc('aval_foto_remover', { p_foto: fotoId }); },
+    enviarFoto: function (avaliacaoId, avariaId, fotoId, blob) {
+      return request('/functions/v1/avaliacao-fotos?acao=enviar&avaliacao_id=' + encodeURIComponent(avaliacaoId) +
+        '&foto_id=' + encodeURIComponent(fotoId) + (avariaId ? '&avaria_id=' + encodeURIComponent(avariaId) : ''), blob, 'image/jpeg');
+    },
+    verFotos: function (avaliacaoId) {
+      return request('/functions/v1/avaliacao-fotos?acao=ver&avaliacao_id=' + encodeURIComponent(avaliacaoId), {});
+    },
+    reparos: function () { return rpc('aval_reparos_listar', {}); },
+    salvarReparos: function (itens, observacao) { return rpc('aval_master_salvar_reparos', { p_itens: itens, p_observacao: observacao || '' }); }
   };
 })();

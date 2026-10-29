@@ -1,0 +1,3 @@
+three.js r160 (MIT, ver LICENSE), copiado de cdn.jsdelivr.net/npm/three@0.160.0 em 28/10/2026.
+Os complementos (lines/*, utils/BufferGeometryUtils) tiveram só o "from 'three'" trocado por "./three.module.min.js" (sem import map no Portal).
+Usado só pela vistoria das Avaliações (avaliacoes-vistoria.mjs), carregado sob demanda.
