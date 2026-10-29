@@ -73,7 +73,10 @@
       }
       return null;
     }
-    return { modelsByName: modelsByName, modelNames: modelNames, coefLookup: coefLookup };
+    // Assistente de solução financeira (30/10/2026): a mesma tabela, no formato do motor (prazo -> taxa -> coeficiente).
+    var txCoef = {};
+    tc.forEach(function (r) { (txCoef[String(r.prazo)] = txCoef[String(r.prazo)] || {})[String(r.taxa)] = r.coeficiente; });
+    return { modelsByName: modelsByName, modelNames: modelNames, coefLookup: coefLookup, txCoef: txCoef };
   }
 
   function refreshCampArea() {
@@ -636,6 +639,27 @@
     resultRegion.innerHTML = currentMode === 'subsidiadas' ? SUBS_ESCOLHA : UI.emptyBlock('Preencha os campos e clique em Calcular.');
     wireForm(currentMode);
     UI.syncEntries(formRegion);
+    // Assistente de solução financeira (30/10/2026): botão "Encontrar a melhor solução" nos planos com valor do bem e entrada.
+    if (window.NX_ASSISTENTE) window.NX_ASSISTENTE.anexar(formRegion);
+  }
+
+  /* Assistente de solução financeira: as MESMAS tabelas vigentes que os planos usam, no formato do motor
+     (engine/assistente.ts). Nenhuma conta aqui. Coparticipado é opcional: sem ele, o assistente não oferece essa campanha. */
+  function tabelasAssistente() {
+    return Promise.all([linearAuthority.ensure(), tradPeriodAuthority.ensure(), subsidiadasAuthority.ensure()]).then(function (r) {
+      var copart = ensureCampAuthority().then(function (a) { return a; }, function () { return null; });
+      return copart.then(function (camp) {
+        return {
+          tabelas: {
+            linear: r[0], tradicional: r[1].tradicional, periodica: r[1].periodica, rebates: r[2],
+            parcelaUnica: { entrada: 0.5, prazo: 25, max: 1, taxa: 0.0177, coef: 1.6831 }, taxaBotao: {},
+            copartModels: camp ? camp.modelNames.map(function (n) { return camp.modelsByName[n]; }) : [],
+            copartTxCoef: camp ? camp.txCoef : {}, semestralModelos: {}
+          },
+          copart: !!camp
+        };
+      });
+    });
   }
 
   /* ---------- PORTAL-NEXT-08.2 Change 2: balanced term grid, replacing
@@ -1316,6 +1340,7 @@
         '</div>';
       wireModeNav();
       wireAnalystCta();
+      if (window.NX_ASSISTENTE) window.NX_ASSISTENTE.novaVisita({ tabelas: tabelasAssistente, valor: function () { return UI.moneyVal('nBem'); }, entrada: function () { return UI.moneyVal('nEntrada'); } });
       renderModeArea();
       return Promise.resolve();
     }
