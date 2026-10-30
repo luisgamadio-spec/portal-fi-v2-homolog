@@ -1,7 +1,7 @@
 /* GERADO — não editar. Assistente de solução financeira: regra das 3 propostas (Simulador de Novos).
-   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 9f47f1b).
+   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 1f45060).
    Gerador: docs/assistente/gerar_regra_navegador.ts. sha256 das fontes (16 primeiros):
-   engine/assistente.ts 8ce4c175026b78d9
+   engine/assistente.ts 47178923ac6d8428
    engine/novos.ts 341f5dc0aa5382ef
    engine/ofertas.ts 2005d0d02d5ddf4d
    engine/comum.ts 5199112a8c402a3c
@@ -18,6 +18,8 @@
   var assistente_exports = {};
   __export(assistente_exports, {
     CONFIG_PADRAO: () => CONFIG_PADRAO,
+    ENTRADA_MIN_CAMPANHAS: () => ENTRADA_MIN_CAMPANHAS,
+    alcancaEntradaCampanhas: () => alcancaEntradaCampanhas,
     campanhasPermitidas: () => campanhasPermitidas,
     montarTresPropostas: () => montarTresPropostas,
     perfilDasRespostas: () => perfilDasRespostas
@@ -326,6 +328,12 @@
   }
 
   // supabase/functions/brabus-intelligence/engine/assistente.ts
+  var ENTRADA_MIN_CAMPANHAS = 0.5;
+  function alcancaEntradaCampanhas(valor, entrada, r) {
+    if (!(valor > 0)) return false;
+    const extra = r.dinheiro === "sim" && r.dinheiro_extra > 0 ? r.dinheiro_extra : 0;
+    return entrada / valor >= ENTRADA_MIN_CAMPANHAS - 1e-12 || extra > 0 && (entrada + extra) / valor >= ENTRADA_MIN_CAMPANHAS - 1e-12;
+  }
   function campanhasPermitidas(rebate, bonusTradeIn) {
     if (!rebate) return {
       taxa_subsidiada: false,
@@ -482,6 +490,10 @@
         ...config.campanhas ?? {}
       }
     };
+    if (!alcancaEntradaCampanhas(e.valor, e.entrada, r)) cfg.campanhas = {
+      taxa_subsidiada: false,
+      coparticipado: false
+    };
     if (!(e.valor > 0)) return {
       erro: "Informe o valor do ve\xEDculo."
     };
@@ -529,19 +541,20 @@
     const menosJuros = pega([
       ...todasCabem
     ].sort(porPrazo));
-    const maisLeve = baseCabe.length ? [
-      ...baseCabe
-    ].sort(porParcela)[0] : null;
-    if (!maisLeve || menosJuros.entrada === e.entrada && menosJuros.parcela <= maisLeve.parcela + 1e-9) {
-      return dominante(ctx, todasCabem, baseCabe, menosJuros, todas.length);
+    const levePool = baseCabe.length ? baseCabe : todasCabem;
+    const maisLeve = [
+      ...levePool
+    ].sort(porParcela)[0];
+    if (chave(maisLeve) === chave(menosJuros) || menosJuros.parcela <= maisLeve.parcela + 1e-9) {
+      return dominante(ctx, todasCabem, levePool, menosJuros, todas.length);
     }
     const leve = pega([
-      ...baseCabe
+      ...levePool
     ].sort(porParcela));
     let meio = null, rotuloMeio = "Equil\xEDbrio";
     if (leve) {
-      const livres = baseCabe.filter((c) => !usadas.has(chave(c)));
-      const fronteira = livres.filter((c) => !baseCabe.some((o) => o !== c && o.parcela <= c.parcela && o.prazo <= c.prazo && (o.parcela < c.parcela || o.prazo < c.prazo))).filter((c) => c.parcela > leve.parcela && c.parcela < menosJuros.parcela && c.prazo < leve.prazo && c.prazo > menosJuros.prazo).sort(porParcela);
+      const livres = levePool.filter((c) => !usadas.has(chave(c)));
+      const fronteira = livres.filter((c) => !levePool.some((o) => o !== c && o.parcela <= c.parcela && o.prazo <= c.prazo && (o.parcela < c.parcela || o.prazo < c.prazo))).filter((c) => c.parcela > leve.parcela && c.parcela < menosJuros.parcela && c.prazo < leve.prazo && c.prazo > menosJuros.prazo).sort(porParcela);
       if (fronteira.length) meio = pega([
         fronteira[Math.floor((fronteira.length - 1) / 2)]
       ]);
@@ -663,11 +676,11 @@
         "Parcela mais leve: menor parcela. Quita mais r\xE1pido: menor prazo que cabe (desempate pelo menor custo). Equil\xEDbrio: entre as duas, sem perder nas duas.",
         "Parcelas iguais \xE0s do Simulador (seguro prestamista dentro no Bal\xE3o e no Coparticipado).",
         "Rebate, valor final de venda, retorno e comiss\xE3o n\xE3o entram na escolha. O Plano Bal\xE3o n\xE3o tem prioridade.",
-        "Campanhas: sem rebate, nenhuma; com b\xF4nus de trade-in, s\xF3 a Taxa Subsidiada."
+        "Campanhas: s\xF3 se o cliente chega a 50% de entrada (com ou sem o dinheiro extra); sem rebate, nenhuma; com b\xF4nus de trade-in, s\xF3 a Taxa Subsidiada."
       ]
     };
   }
 
-  // ../../Users/luis9/AppData/Local/Temp/2cd2eec075df28a8/entrada.ts
+  // ../../Users/luis9/AppData/Local/Temp/66a404e3e4982b2d/entrada.ts
   globalThis.NX_ASSISTENTE_REGRA = assistente_exports;
 })();

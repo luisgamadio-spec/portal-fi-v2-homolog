@@ -191,6 +191,10 @@
     document.removeEventListener('keydown', teclaEsc);
     if (!semLimpar) st = null;
   }
+  function podePerguntarRebate() {
+    var r = respostasRegra();
+    return REGRA.alcancaEntradaCampanhas(pagina.valor(), pagina.entrada(), { dinheiro: r.dinheiro, dinheiro_extra: r.dinheiro_extra });
+  }
   function vendVisiveis() { return VENDEDOR.filter(function (q) { return !q.so || q.so(st.vend); }); }
 
   function desenhar() {
@@ -261,7 +265,7 @@
     if (res && !res.erro) {
       registrar('concluido', {
         perfil_cliente: res.perfil, faixa_parcela: st.resp.faixa, troca: st.resp.troca, dinheiro: st.resp.dinheiro,
-        campanhas_liberadas: rebate, bonus_trade_in: rebate ? trade : null, modelo: camp.coparticipado && st.modelo ? st.modelo : null,
+        campanhas_liberadas: st.vend.rebate ? rebate : null, bonus_trade_in: rebate ? trade : null, modelo: camp.coparticipado && st.modelo ? st.modelo : null,
         alerta_renda: res.alerta_renda, propostas_qtd: Math.min(3, res.propostas.length)
       });
     }
@@ -288,7 +292,7 @@
     dito.push(r.troca === 'sim' ? 'troca em 2–3 anos' : (r.troca === 'nao' ? 'fica bastante tempo com o carro' : 'ainda não sabe quando troca'));
     if (r.dinheiro === 'sim' && r.dinheiro_extra > 0) dito.push('tem cerca de ' + brl0(r.dinheiro_extra) + ' além da entrada');
     if (r.dinheiro === 'nao_mexer') dito.push('não quer mexer na reserva');
-    dito.push(st.vend.rebate !== 'sim' ? 'sem rebate' : (st.vend.tradein === 'sim' ? 'rebate com bônus de trade-in' : 'rebate possível'));
+    dito.push(!st.vend.rebate ? 'campanhas não se aplicam (entrada abaixo de 50%)' : (st.vend.rebate !== 'sim' ? 'sem rebate' : (st.vend.tradein === 'sim' ? 'rebate com bônus de trade-in' : 'rebate possível')));
     var corpo;
     if (res.nenhuma_cabe) {
       corpo = '<div class="asstNota warn">Nenhuma combinação cabe em ' + brl0(r.parcela_max) + ' por mês com esta entrada. Esta é a que chega mais perto:</div>' +
@@ -344,9 +348,15 @@
         if (a === 'fechar') return fechar();
         if (a === 'voltar') {
           if (st.passo === 'pergunta') { if (st.idx === 0) return fechar(); st.idx--; }
+          else if (st.passo === 'resultado') { st.passo = 'pergunta'; st.idx = PERGUNTAS.length - 1; }
           else if (st.passo === 'vendedor') { if (st.idx === 0) { st.passo = 'pergunta'; st.idx = PERGUNTAS.length - 1; } else st.idx--; }
         } else if (a === 'proxima') {
-          if (st.passo === 'pergunta') { if (st.idx < PERGUNTAS.length - 1) st.idx++; else { st.passo = 'vendedor'; st.idx = 0; } }
+          if (st.passo === 'pergunta') {
+            if (st.idx < PERGUNTAS.length - 1) st.idx++;
+            // 31/10: rebate/trade-in só se o cliente chega a 50% de entrada (com ou sem o dinheiro extra); senão, direto às propostas
+            else if (podePerguntarRebate()) { st.passo = 'vendedor'; st.idx = 0; }
+            else { st.vend = { rebate: null, tradein: null }; calcular(); st.passo = 'resultado'; }
+          }
           else { var vq = vendVisiveis(); if (st.idx < vq.length - 1) st.idx++; else { calcular(); st.passo = 'resultado'; } }
         } else if (a === 'editar') { st.passo = 'pergunta'; st.idx = 0; }
         else if (a === 'voltarResultado') { st.passo = 'resultado'; }
