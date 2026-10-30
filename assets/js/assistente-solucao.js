@@ -26,13 +26,13 @@
   var FAIXAS = [['ate3000', 'Até R$ 3.000', 3000], ['ate4500', 'Até R$ 4.500', 4500], ['ate6000', 'Até R$ 6.000', 6000],
     ['ate8000', 'Até R$ 8.000', 8000], ['outro', 'Outro valor', null], ['naosei', 'Ainda não sei', null]];
   var PERGUNTAS = [
-    { id: 'prioridade', q: 'O que pesa mais pra você hoje?', opts: [['parcela', 'Parcela leve no mês'], ['juros', 'Pagar menos juros no total'], ['aplicado', 'Deixar meu dinheiro aplicado'], ['avista', 'Prefiro pagar à vista']] },
+    { id: 'prioridade', q: 'O que pesa mais pra você hoje?', opts: [['parcela', 'Parcela leve no mês'], ['juros', 'Quitar mais rápido'], ['aplicado', 'Deixar meu dinheiro aplicado'], ['avista', 'Prefiro pagar à vista']] },
     { id: 'faixa', q: 'Qual parcela fica confortável por mês, sem apertar?', opts: FAIXAS.map(function (f) { return [f[0], f[1]]; }) },
     { id: 'troca', q: 'Pretende trocar de carro em 2 ou 3 anos?', opts: [['sim', 'Sim, troco logo'], ['nao', 'Não, vou ficar bastante tempo'], ['nao_sei', 'Ainda não sei']] },
     { id: 'dinheiro', q: 'Além da entrada, tem algum dinheiro que poderia usar?', opts: [['nao', 'Não'], ['sim', 'Sim'], ['nao_mexer', 'Tenho, mas prefiro deixar aplicado']] }
   ];
   var TXT_PERGUNTAS = PERGUNTAS.length + ' perguntas rápidas ao cliente';
-  var PERFIL_NOME = { PARCELA: 'Parcela', CUSTO_TOTAL: 'Custo total', LIQUIDEZ: 'Liquidez', A_VISTA: 'À vista' };
+  var PERFIL_NOME = { PARCELA: 'Parcela', CUSTO_TOTAL: 'Quitar mais rápido', LIQUIDEZ: 'Liquidez', A_VISTA: 'À vista' };
 
   // ---------- utilidades ----------
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -287,7 +287,7 @@
     var res = st.res;
     if (!res || res.erro) return '<div class="errorState">' + esc(res ? res.erro : 'Não foi possível montar as propostas.') + '</div><div class="asstNav"><button type="button" class="btn btn-secondary" data-a="editar">Mudar respostas</button></div>';
     var r = respostasRegra(), dito = [];
-    dito.push({ parcela: 'Parcela leve no mês', juros: 'Menos juros no total', aplicado: 'Dinheiro aplicado', avista: 'Pagar à vista' }[r.prioridade]);
+    dito.push({ parcela: 'Parcela leve no mês', juros: 'Quitar mais rápido', aplicado: 'Dinheiro aplicado', avista: 'Pagar à vista' }[r.prioridade]);
     if (r.parcela_max) dito.push('parcela até ' + brl0(r.parcela_max));
     dito.push(r.troca === 'sim' ? 'troca em 2–3 anos' : (r.troca === 'nao' ? 'fica bastante tempo com o carro' : 'ainda não sabe quando troca'));
     if (r.dinheiro === 'sim' && r.dinheiro_extra > 0) dito.push('tem cerca de ' + brl0(r.dinheiro_extra) + ' além da entrada');

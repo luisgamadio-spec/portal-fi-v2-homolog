@@ -1,7 +1,7 @@
 /* GERADO — não editar. Assistente de solução financeira: regra das 3 propostas (Simulador de Novos).
-   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 767b1f1).
+   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit e1cdb5d).
    Gerador: docs/assistente/gerar_regra_navegador.ts. sha256 das fontes (16 primeiros):
-   engine/assistente.ts 9b7b95d14cdcee6b
+   engine/assistente.ts c6a232b94f7e6cae
    engine/novos.ts 341f5dc0aa5382ef
    engine/ofertas.ts 2005d0d02d5ddf4d
    engine/comum.ts 5199112a8c402a3c
@@ -681,6 +681,6 @@
     };
   }
 
-  // ../../Users/luis9/AppData/Local/Temp/96d80072283c862b/entrada.ts
+  // ../../Users/luis9/AppData/Local/Temp/84216a2df5647c70/entrada.ts
   globalThis.NX_ASSISTENTE_REGRA = assistente_exports;
 })();
