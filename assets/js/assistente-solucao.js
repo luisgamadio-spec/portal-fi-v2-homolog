@@ -259,7 +259,7 @@
     if (res && !res.erro) {
       registrar('concluido', {
         perfil_cliente: res.perfil, faixa_parcela: st.resp.faixa, troca: st.resp.troca, dinheiro: st.resp.dinheiro,
-        campanhas_liberadas: rebate, modelo: camp.coparticipado && st.modelo ? st.modelo : null,
+        campanhas_liberadas: rebate, bonus_trade_in: rebate ? trade : null, modelo: camp.coparticipado && st.modelo ? st.modelo : null,
         alerta_renda: res.alerta_renda, propostas_qtd: Math.min(3, res.propostas.length)
       });
     }

@@ -1,7 +1,7 @@
 /* GERADO — não editar. Assistente de solução financeira: regra das 3 propostas (Simulador de Novos).
-   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 26014c0).
+   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 9f47f1b).
    Gerador: docs/assistente/gerar_regra_navegador.ts. sha256 das fontes (16 primeiros):
-   engine/assistente.ts 28b98141dd62cefb
+   engine/assistente.ts 8ce4c175026b78d9
    engine/novos.ts 341f5dc0aa5382ef
    engine/ofertas.ts 2005d0d02d5ddf4d
    engine/comum.ts 5199112a8c402a3c
@@ -471,6 +471,7 @@
   }
   var chave = (c) => `${c.plano}|${c.variante ?? ""}|${c.prazo}|${c.entrada}|${c.baloes.map((b) => `${b.mes}:${b.valor}`).join(",")}`;
   var porCusto = (a, b) => a.custo - b.custo || a.parcela - b.parcela || a.prazo - b.prazo || (chave(a) < chave(b) ? -1 : 1);
+  var porPrazo = (a, b) => a.prazo - b.prazo || a.custo - b.custo || a.parcela - b.parcela || (chave(a) < chave(b) ? -1 : 1);
   var porParcela = (a, b) => a.parcela - b.parcela || a.custo - b.custo || a.prazo - b.prazo || (chave(a) < chave(b) ? -1 : 1);
   function montarTresPropostas(e, r, config = {}) {
     const cfg = {
@@ -527,7 +528,7 @@
     };
     const menosJuros = pega([
       ...todasCabem
-    ].sort(porCusto));
+    ].sort(porPrazo));
     const maisLeve = baseCabe.length ? [
       ...baseCabe
     ].sort(porParcela)[0] : null;
@@ -540,12 +541,12 @@
     let meio = null, rotuloMeio = "Equil\xEDbrio";
     if (leve) {
       const livres = baseCabe.filter((c) => !usadas.has(chave(c)));
-      const fronteira = livres.filter((c) => !baseCabe.some((o) => o !== c && o.parcela <= c.parcela && o.custo <= c.custo && (o.parcela < c.parcela || o.custo < c.custo))).filter((c) => c.parcela > leve.parcela && c.parcela < menosJuros.parcela && c.custo < leve.custo && c.custo > menosJuros.custo).sort(porParcela);
+      const fronteira = livres.filter((c) => !baseCabe.some((o) => o !== c && o.parcela <= c.parcela && o.prazo <= c.prazo && (o.parcela < c.parcela || o.prazo < c.prazo))).filter((c) => c.parcela > leve.parcela && c.parcela < menosJuros.parcela && c.prazo < leve.prazo && c.prazo > menosJuros.prazo).sort(porParcela);
       if (fronteira.length) meio = pega([
         fronteira[Math.floor((fronteira.length - 1) / 2)]
       ]);
       if (!meio && leve.plano === "BALAO" && menosJuros.plano === "BALAO") {
-        meio = pega(livres.filter((c) => c.plano !== "BALAO").sort(porCusto));
+        meio = pega(livres.filter((c) => c.plano !== "BALAO").sort(porPrazo));
         if (meio) rotuloMeio = "Sem bal\xE3o";
       }
     }
@@ -559,8 +560,8 @@
     const lim = max === null ? "" : ` em ${brl0(max)}`;
     const props = [];
     if (leve) props.push(prop(ctx, leve, "leve", "Parcela mais leve", destaque[perfil] === "leve", `\xC9 a menor parcela entre as op\xE7\xF5es que cabem${lim}.`));
-    if (meio) props.push(prop(ctx, meio, "meio", rotuloMeio, destaque[perfil] === "meio", rotuloMeio === "Sem bal\xE3o" ? `Sem bal\xE3o no fim, com parcela que cabe${lim}.` : `Meio-termo: parcela menor que a de menos juros e custo menor que o da mais leve.`));
-    props.push(prop(ctx, menosJuros, "menos_juros", "Menos juros", destaque[perfil] === "menos_juros", `Cabe${lim} e \xE9 a que menos custa no total.`));
+    if (meio) props.push(prop(ctx, meio, "meio", rotuloMeio, destaque[perfil] === "meio", rotuloMeio === "Sem bal\xE3o" ? `Sem bal\xE3o no fim, com parcela que cabe${lim}.` : `Meio-termo: parcela menor que a de quem quita mais r\xE1pido e prazo menor que o da mais leve.`));
+    props.push(prop(ctx, menosJuros, "menos_juros", "Quita mais r\xE1pido", destaque[perfil] === "menos_juros", `Cabe${lim} e \xE9 o menor prazo que cabe no bolso.`));
     return resultado(ctx, props, todas.length, false, null, []);
   }
   function dominante(ctx, todasCabem, baseCabe, melhor, avaliadas) {
@@ -569,14 +570,14 @@
     const prefixo = melhor.plano === "BALAO" ? "Sem bal\xE3o" : campanha ? "Sem campanha" : "Outro plano";
     const lim = ctx.max === null ? "" : ` em ${brl0(ctx.max)}`;
     const props = [
-      prop(ctx, melhor, "melhor", "Mais leve e menos juros", ctx.perfil !== "A_VISTA", `Cabe${lim} com a menor parcela e tamb\xE9m o menor custo entre as op\xE7\xF5es.`)
+      prop(ctx, melhor, "melhor", "Mais leve e quita mais r\xE1pido", ctx.perfil !== "A_VISTA", `Cabe${lim} com a menor parcela e tamb\xE9m o menor prazo entre as op\xE7\xF5es.`)
     ];
     const altLeve = baseCabe.filter(outra).sort(porParcela)[0];
-    const altJuros = todasCabem.filter(outra).sort(porCusto)[0];
+    const altJuros = todasCabem.filter(outra).sort(porPrazo)[0];
     if (altLeve) props.push(prop(ctx, altLeve, "leve", `${prefixo} \xB7 parcela mais leve`, false, `${prefixo}: a menor parcela que cabe${lim}.`));
-    if (altJuros && (!altLeve || chave(altJuros) !== chave(altLeve))) props.push(prop(ctx, altJuros, "menos_juros", `${prefixo} \xB7 menos juros`, false, `${prefixo}: cabe${lim} e \xE9 a que menos custa no total.`));
+    if (altJuros && (!altLeve || chave(altJuros) !== chave(altLeve))) props.push(prop(ctx, altJuros, "menos_juros", `${prefixo} \xB7 quita mais r\xE1pido`, false, `${prefixo}: cabe${lim} e \xE9 o menor prazo que cabe no bolso.`));
     if (props.length === 1) {
-      const resto = todasCabem.filter((c) => chave(c) !== chave(melhor)).sort(porCusto)[0];
+      const resto = todasCabem.filter((c) => chave(c) !== chave(melhor)).sort(porPrazo)[0];
       if (resto) props.push(prop(ctx, resto, "menos_juros", "Outra op\xE7\xE3o", false, `Tamb\xE9m cabe${lim}.`));
     }
     return resultado(ctx, props, avaliadas, false, null, []);
@@ -659,7 +660,7 @@
       opcoes_avaliadas: avaliadas,
       criterios: [
         "Todas as propostas cabem na parcela confort\xE1vel; se nada couber, a mais perto e o que falta para caber.",
-        "Parcela mais leve: menor parcela. Menos juros: menor custo somando entrada, parcelas e bal\xE3o. Equil\xEDbrio: entre as duas, sem perder nas duas.",
+        "Parcela mais leve: menor parcela. Quita mais r\xE1pido: menor prazo que cabe (desempate pelo menor custo). Equil\xEDbrio: entre as duas, sem perder nas duas.",
         "Parcelas iguais \xE0s do Simulador (seguro prestamista dentro no Bal\xE3o e no Coparticipado).",
         "Rebate, valor final de venda, retorno e comiss\xE3o n\xE3o entram na escolha. O Plano Bal\xE3o n\xE3o tem prioridade.",
         "Campanhas: sem rebate, nenhuma; com b\xF4nus de trade-in, s\xF3 a Taxa Subsidiada."
@@ -667,6 +668,6 @@
     };
   }
 
-  // ../../Users/luis9/AppData/Local/Temp/e8145c69bea4a715/entrada.ts
+  // ../../Users/luis9/AppData/Local/Temp/2cd2eec075df28a8/entrada.ts
   globalThis.NX_ASSISTENTE_REGRA = assistente_exports;
 })();
