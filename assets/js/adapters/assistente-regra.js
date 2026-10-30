@@ -1,10 +1,10 @@
 /* GERADO — não editar. Assistente de solução financeira: regra das 3 propostas (Simulador de Novos).
-   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 400cee9).
+   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 85178bc).
    Gerador: docs/assistente/gerar_regra_navegador.ts. sha256 das fontes (16 primeiros):
-   engine/assistente.ts 3ef8ab73af9b788c
+   engine/assistente.ts 63dc25ee813cfd12
    engine/novos.ts 341f5dc0aa5382ef
    engine/ofertas.ts 2005d0d02d5ddf4d
-   engine/comum.ts 2fd6c72c675cfeb1
+   engine/comum.ts 5199112a8c402a3c
    engine/seminovos.ts 2bfcfcb2801df366
    Expõe window.NX_ASSISTENTE_REGRA (montarTresPropostas, CONFIG_PADRAO, AVISO_IOF_LINEAR, ...). */
 (() => {
@@ -44,10 +44,6 @@
     const { ADICIONAL, CAD, REG, IOF } = BASE_BALAO;
     const subtotal = Math.max(0, fin) * (1 + ADICIONAL) + CAD + REG;
     return subtotal / (1 - IOF);
-  }
-  function baseInternaSemSeguro(fin) {
-    const { CAD, REG, IOF } = BASE_BALAO;
-    return (Math.max(0, fin) + CAD + REG) / (1 - IOF);
   }
   function fatorPrice(i, n) {
     return (1 - Math.pow(1 + i, -n)) / i;
@@ -124,8 +120,8 @@
   function planoPorFaixa(tab, prazo, pe) {
     return tab.filter((r) => r.prazo === prazo && pe >= r.entrada).sort((a, b) => b.entrada - a.entrada)[0] ?? null;
   }
-  function validaBaloes(baloes, prazo) {
-    const lista = (baloes ?? []).map((b) => ({
+  function validaBaloes(baloes2, prazo) {
+    const lista = (baloes2 ?? []).map((b) => ({
       mes: Number(b.mes) || 0,
       valor: Number(b.valor) || 0
     })).filter((b) => b.mes || b.valor);
@@ -151,7 +147,7 @@
   }
   var ENTRADA_MIN_BALAO_NOVOS = 0.1;
   var MAX_BALOES_TRADICIONAL = 4;
-  function balaoTradicional(bem, entrada, prazo, baloes, t) {
+  function balaoTradicional(bem, entrada, prazo, baloes2, t) {
     if (!(bem > 0)) return {
       erro: "Informe o valor do bem."
     };
@@ -167,7 +163,7 @@
     if (!plano) return {
       erro: "Prazo sem regra cadastrada na tabela para a faixa de entrada informada."
     };
-    const v = validaBaloes(baloes, prazo);
+    const v = validaBaloes(baloes2, prazo);
     if ("erro" in v) return v;
     if (v.lista.length > MAX_BALOES_TRADICIONAL) return {
       erro: `Escolha at\xE9 ${MAX_BALOES_TRADICIONAL} bal\xF5es.`
@@ -386,7 +382,7 @@
       cet_am: cetEstimado(c.financiado, pagamentos)
     };
   }
-  function baloesSemSeguro(e, entrada, cfg) {
+  function baloes(e, entrada, cfg) {
     const out = [];
     const fin = e.valor - entrada;
     for (const est of BALAO_PREFERIDAS) {
@@ -402,28 +398,15 @@
       ];
       const sim = balaoTradicional(e.valor, entrada, est.prazo, bs, e.tabelas);
       if (ehErro(sim)) continue;
-      const i = taxaInterna(sim.taxa);
-      const vpBaloes = bs.reduce((s, b) => s + b.valor / Math.pow(1 + i, b.mes), 0);
-      const saldo = baseInternaSemSeguro(fin) - vpBaloes;
-      if (saldo <= 0) continue;
-      const parcela = saldo / fatorPrice(i, est.prazo);
-      const seguro = {
-        produto: "SEGURO_PRESTAMISTA",
-        valor_financiado: baseInterna(fin) - baseInternaSemSeguro(fin),
-        parcela_com_seguro: sim.parcela,
-        acrescimo_parcela: sim.parcela - parcela,
-        acrescimo_total: (sim.parcela - parcela) * est.prazo
-      };
       out.push(cand({
         plano: "BALAO",
         plano_nome: `Plano Bal\xE3o \u2014 ${est.nome}`,
         prazo: est.prazo,
         entrada,
         financiado: fin,
-        parcela,
+        parcela: sim.parcela,
         baloes: bs,
-        taxa: sim.taxa,
-        seguro
+        taxa: sim.taxa
       }, e.valor));
     }
     return out;
@@ -433,15 +416,6 @@
     const lin = linear(e.valor, entrada, e.tabelas);
     if (!ehErro(lin)) {
       for (const it of lin.itens) if (it.parcela && it.taxa !== null) {
-        const coef = coefLinear(it.taxa, it.prazo);
-        const comSeguro = baseCalculoLinear(lin.financiado * (1 + BASE_BALAO.ADICIONAL), it.prazo) * coef;
-        const seguro = {
-          produto: "SEGURO_PRESTAMISTA",
-          valor_financiado: baseCalculoLinear(lin.financiado * (1 + BASE_BALAO.ADICIONAL), it.prazo) - baseCalculoLinear(lin.financiado, it.prazo),
-          parcela_com_seguro: comSeguro,
-          acrescimo_parcela: comSeguro - it.parcela,
-          acrescimo_total: (comSeguro - it.parcela) * it.prazo
-        };
         out.push(cand({
           plano: "LINEAR",
           plano_nome: "Financiamento Linear",
@@ -450,12 +424,11 @@
           financiado: lin.financiado,
           parcela: it.parcela,
           baloes: [],
-          taxa: it.taxa,
-          seguro
+          taxa: it.taxa
         }, e.valor));
       }
     }
-    if (comBalao) out.push(...baloesSemSeguro(e, entrada, cfg));
+    if (comBalao) out.push(...baloes(e, entrada, cfg));
     if (cfg.campanhas_liberadas) {
       const sub = taxasSubsidiadas(e.valor, entrada, 0, e.tabelas);
       if (!ehErro(sub)) for (const l of sub.linhas) {
@@ -468,8 +441,7 @@
           financiado: sub.financiado,
           parcela: l.parcela,
           baloes: [],
-          taxa: l.taxa,
-          seguro: null
+          taxa: l.taxa
         }, e.valor));
       }
       const nome = casaModelo(e.modelo, e.versao, e.tabelas.copartModels.map((m) => m.name));
@@ -477,25 +449,15 @@
         const cp = coparticipado(nome, e.valor, entrada, e.tabelas);
         if (!ehErro(cp)) {
           for (const x of cp.termos) if (x.parcela) {
-            const acr = x.prazo <= 24 ? 0.0411 : 0.0622;
-            const parcela = x.parcela / (1 + acr);
-            const seguro = {
-              produto: "SEGURO_PRESTAMISTA",
-              valor_financiado: cp.financiado * acr,
-              parcela_com_seguro: x.parcela,
-              acrescimo_parcela: x.parcela - parcela,
-              acrescimo_total: (x.parcela - parcela) * x.prazo
-            };
             out.push(cand({
               plano: "COPARTICIPADO",
               plano_nome: "Plano Coparticipado",
               prazo: x.prazo,
               entrada,
               financiado: cp.financiado,
-              parcela,
+              parcela: x.parcela,
               baloes: [],
-              taxa: x.taxa,
-              seguro
+              taxa: x.taxa
             }, e.valor));
           }
         }
@@ -647,7 +609,6 @@
         renda_pct: rendaPct,
         renda_alta: rendaPct !== null && rendaPct > cfg.limite_renda
       },
-      seguro: c.seguro,
       usa_dinheiro_extra: Math.max(0, c.entrada - e.entrada),
       destaque
     };
@@ -672,7 +633,7 @@
         "Equil\xEDbrio: op\xE7\xE3o que nenhuma outra supera ao mesmo tempo em parcela e em total pago, entre as duas pontas.",
         "Se uma op\xE7\xE3o vence nas duas pontas, ela aparece sozinha em destaque, com alternativas de outra estrutura.",
         "Rebate, valor final de venda, retorno e comiss\xE3o n\xE3o entram na escolha. O Plano Bal\xE3o n\xE3o tem prioridade.",
-        "Seguro prestamista fora das propostas; oferecido \xE0 parte, com aceite pr\xF3prio do cliente.",
+        "Parcelas iguais \xE0s do Simulador: no Bal\xE3o e no Coparticipado o seguro prestamista vem dentro da parcela e do CET.",
         "Linear com o mesmo c\xE1lculo do Simulador.",
         "Conta \xE0 vista: CDI das Refer\xEAncias de Mercado, l\xEDquido do IR da faixa do prazo de cada proposta.",
         "CET estimado; o oficial vem no contrato do banco."
@@ -680,6 +641,6 @@
     };
   }
 
-  // ../../Users/luis9/AppData/Local/Temp/2c110ae0ed1733d0/entrada.ts
+  // ../../Users/luis9/AppData/Local/Temp/37d3bc98e360c3fd/entrada.ts
   globalThis.NX_ASSISTENTE_REGRA = assistente_exports;
 })();

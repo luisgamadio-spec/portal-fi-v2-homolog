@@ -7,7 +7,8 @@
      do prazo de cada proposta; mostra a data da referência e o nome das propostas que custam menos que pagar à vista.
    - TODOS os números vêm de window.NX_ASSISTENTE_REGRA (gerado de engine/assistente.ts, a mesma regra testada na função) com as
      tabelas vigentes do próprio simulador. Este arquivo não faz conta de financiamento: só formata o que a regra devolve.
-   - Seguro prestamista fora das propostas; passo separado com valor, efeito na parcela e aceite próprio do cliente.
+   - (31/10) Seguro prestamista: no Balão e no Coparticipado vem dentro da parcela, exatamente como no Simulador (e no CET);
+     no Linear, igual ao Simulador, sem seguro. Não há passo de opcionais.
    - Registro de uso (assist_registrar_evento): só códigos de resposta e a proposta escolhida, nunca nome, CPF, renda ou valores
      digitados. Mesma trava da telemetria dos simuladores: grava de verdade só em AUTHORIZED_PRODUCTION; fora dela, fica no log local. */
 (function () {
@@ -157,7 +158,7 @@
     registrar('aberto', { origem: origem });
     sessao.aberto = true;
     st = { passo: 'antes', idx: 0, origem: origem, resp: { prioridade: null, faixa: null, outroValor: '', renda: '', troca: null, dinheiro: null, dinheiroValor: '' }, ref: null,
-      campanhas: false, modelo: '', tab: null, copart: false, carregando: true, erro: null, res: null, escolha: null, seguroAceito: null, resultado: null };
+      campanhas: false, modelo: '', tab: null, copart: false, carregando: true, erro: null, res: null, escolha: null, resultado: null };
     montarJanela();
     // Referências de Mercado (Cash Conversion, mantidas pelo Master): sem elas, só a conta à vista some.
     var ref = rpc('cash_referencias_mercado', {}).then(function (r) { return r && r.cdi_aa ? r : null; }, function () { return null; });
@@ -196,7 +197,6 @@
     else if (st.passo === 'antes') html = antesHtml();
     else if (st.passo === 'pergunta') html = perguntaHtml();
     else if (st.passo === 'resultado') html = resultadoHtml();
-    else if (st.passo === 'seguro') html = seguroHtml();
     else html = finalHtml();
     body.innerHTML = html;
     ligar(body);
@@ -323,29 +323,14 @@
     return '<div class="asstPerfil"><span class="asstPill">Perfil: ' + esc(PERFIL_NOME[res.perfil]) + '</span><span class="asstDito">' + esc(dito.join(' · ')) + '</span><button type="button" class="btn-tertiary" data-a="editar">Mudar respostas</button></div>' +
       topo + nada + '<div class="asstCards">' + res.propostas.map(cartaoHtml).join('') + '</div>' + explica + conta +
       '<div class="asstFino"><span>Estes números são do Simulador de Novos com as tabelas de hoje. CET estimado; o oficial vem no contrato do banco.</span>' +
-      '<span>Seguro prestamista e outros opcionais ficam no próximo passo, separados. O cliente pode trazer o seguro de outra seguradora.</span>' +
       '<span>A sugestão é do assistente; um gestor de F&amp;I revisa antes de qualquer contrato. ' + res.opcoes_avaliadas + ' opções do simulador avaliadas; rebate, retorno e comissão não entram na escolha.</span></div>' +
       '<div class="asstNav"><button type="button" class="btn btn-secondary" data-escolher="nenhuma">Nenhuma serviu</button></div>';
   }
 
-  function seguroHtml() {
-    var p = st.escolha, s = p.seguro;
-    return '<span class="asstHint">Passo separado · opcional</span><p class="asstQ">Seguro prestamista</p>' +
-      '<p class="asstSub">Proposta escolhida: <b>' + esc(p.plano_nome) + ' ' + p.prazo + 'x de ' + brl(p.parcela) + '</b>.</p>' +
-      '<div class="asstSeguro"><dl class="asstKv">' +
-      '<dt>Valor do seguro no contrato</dt><dd>' + brl(s.valor_financiado) + '</dd>' +
-      '<dt>Efeito na parcela</dt><dd>+' + brl(s.acrescimo_parcela) + ' por mês</dd>' +
-      '<dt>Parcela com o seguro</dt><dd>' + brl(s.parcela_com_seguro) + '</dd>' +
-      '<dt>Custo total do seguro no prazo</dt><dd>' + brl(s.acrescimo_total) + '</dd></dl>' +
-      '<p class="asstSub">O seguro é opcional: contratar ou não, não é condição para o financiamento. O cliente pode contratar com outra seguradora (STJ, Tema 972).</p>' +
-      '<div class="asstEscolhaDupla"><button type="button" class="btn ' + (st.seguroAceito === true ? 'btn-primary' : 'btn-secondary') + '" data-seguro="sim" aria-pressed="' + (st.seguroAceito === true) + '">O cliente quer o seguro</button>' +
-      '<button type="button" class="btn ' + (st.seguroAceito === false ? 'btn-primary' : 'btn-secondary') + '" data-seguro="nao" aria-pressed="' + (st.seguroAceito === false) + '">O cliente não quer o seguro</button></div></div>' +
-      '<div class="asstNav"><button type="button" class="btn btn-secondary" data-a="voltarResultado">Voltar às propostas</button><button type="button" class="btn btn-primary" data-a="final"' + (st.seguroAceito === null ? ' disabled' : '') + ' data-foco>Continuar</button></div>';
-  }
   function finalHtml() {
     var p = st.escolha;
     var linha = p === 'avista' ? 'Cliente vai pagar à vista: <b>' + brl0(pagina.valor()) + '</b>.' : (p === 'nenhuma' ? 'Nenhuma proposta serviu.' :
-      'Proposta: <b>' + esc(p.plano_nome) + ' ' + p.prazo + 'x de ' + brl(st.seguroAceito ? p.seguro.parcela_com_seguro : p.parcela) + '</b>' + (p.seguro ? (st.seguroAceito ? ', com seguro prestamista.' : ', sem seguro prestamista.') : '.'));
+      'Proposta: <b>' + esc(p.plano_nome) + ' ' + p.prazo + 'x de ' + brl(p.parcela) + '</b>.');
     var res = st.resultado ? '<p class="asstOk">Registrado: ' + (st.resultado === 'fechou' ? 'cliente fechou' : 'cliente não fechou') + '. Nenhum dado pessoal do cliente é gravado.</p>' : '';
     return '<span class="asstHint">Resumo</span><p class="asstQ">' + linha + '</p>' +
       '<p class="asstSub">Use o simulador para conferir e seguir com a proposta. Quando souber, marque o resultado:</p>' +
@@ -390,18 +375,10 @@
         else if (v === 'nenhuma') { st.escolha = 'nenhuma'; registrar('escolhido', { proposta_coluna: 'nenhuma' }); st.passo = 'final'; }
         else {
           var p = st.res.propostas[Number(v)];
-          st.escolha = p; st.seguroAceito = null;
+          st.escolha = p;
           registrar('escolhido', { proposta_coluna: p.coluna, proposta_plano: p.plano, proposta_prazo: p.prazo, valor_financiado: Math.round(p.financiado / 1000) * 1000 });
-          st.passo = p.seguro ? 'seguro' : 'final';
-          if (!p.seguro) registrar('seguro', { seguro_oferecido: false });
+          st.passo = 'final';
         }
-        desenhar();
-      };
-    });
-    body.querySelectorAll('[data-seguro]').forEach(function (b) {
-      b.onclick = function () {
-        st.seguroAceito = b.getAttribute('data-seguro') === 'sim';
-        registrar('seguro', { seguro_oferecido: true, seguro_aceito: st.seguroAceito });
         desenhar();
       };
     });

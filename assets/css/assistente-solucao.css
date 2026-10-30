@@ -77,7 +77,7 @@ body.asstAberto .baiLauncherRoot { display: none; }   /* o botão flutuante da B
 .asstNota.info { color: var(--color-info); background: var(--color-info-soft); border-color: rgba(111, 168, 201, .3); }
 .asstNota.warn { color: var(--color-warning); background: var(--color-warning-soft); border-color: rgba(219, 166, 72, .35); }
 .asstEscolher { width: 100%; }
-.asstAvista, .asstConta, .asstSeguro { display: grid; gap: 6px; padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid var(--color-hairline-strong);
+.asstAvista, .asstConta { display: grid; gap: 6px; padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid var(--color-hairline-strong);
   font-size: .82rem; color: var(--color-text-secondary); background: var(--color-surface-1); }
 .asstAvista { border-color: var(--color-success); }
 .asstAvista b, .asstConta b { color: var(--color-text-primary); }
@@ -85,7 +85,6 @@ body.asstAberto .baiLauncherRoot { display: none; }   /* o botão flutuante da B
 .asstMono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .asstExplica { margin: 0; border-left: 2px solid var(--color-accent-primary); padding: 3px 0 3px 12px; font-size: .86rem; color: var(--color-text-secondary); max-width: 90ch; }
 .asstFino { display: grid; gap: 3px; font-size: .72rem; color: var(--color-text-muted); }
-.asstSeguro .asstKv { max-width: 460px; }
 .asstEscolhaDupla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; max-width: 560px; }
 @media (max-width: 480px) { .asstEscolhaDupla { grid-template-columns: minmax(0, 1fr); } }
 .asstOk { margin: 0; font-size: .8rem; color: var(--color-success); }
