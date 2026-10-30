@@ -1,7 +1,7 @@
 /* GERADO — não editar. Assistente de solução financeira: regra das 3 propostas (Simulador de Novos).
-   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 85178bc).
+   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 26014c0).
    Gerador: docs/assistente/gerar_regra_navegador.ts. sha256 das fontes (16 primeiros):
-   engine/assistente.ts 63dc25ee813cfd12
+   engine/assistente.ts 28b98141dd62cefb
    engine/novos.ts 341f5dc0aa5382ef
    engine/ofertas.ts 2005d0d02d5ddf4d
    engine/comum.ts 5199112a8c402a3c
@@ -18,8 +18,7 @@
   var assistente_exports = {};
   __export(assistente_exports, {
     CONFIG_PADRAO: () => CONFIG_PADRAO,
-    aliquotaIr: () => aliquotaIr,
-    cetEstimado: () => cetEstimado,
+    campanhasPermitidas: () => campanhasPermitidas,
     montarTresPropostas: () => montarTresPropostas,
     perfilDasRespostas: () => perfilDasRespostas
   });
@@ -120,8 +119,8 @@
   function planoPorFaixa(tab, prazo, pe) {
     return tab.filter((r) => r.prazo === prazo && pe >= r.entrada).sort((a, b) => b.entrada - a.entrada)[0] ?? null;
   }
-  function validaBaloes(baloes2, prazo) {
-    const lista = (baloes2 ?? []).map((b) => ({
+  function validaBaloes(baloes, prazo) {
+    const lista = (baloes ?? []).map((b) => ({
       mes: Number(b.mes) || 0,
       valor: Number(b.valor) || 0
     })).filter((b) => b.mes || b.valor);
@@ -147,7 +146,7 @@
   }
   var ENTRADA_MIN_BALAO_NOVOS = 0.1;
   var MAX_BALOES_TRADICIONAL = 4;
-  function balaoTradicional(bem, entrada, prazo, baloes2, t) {
+  function balaoTradicional(bem, entrada, prazo, baloes, t) {
     if (!(bem > 0)) return {
       erro: "Informe o valor do bem."
     };
@@ -163,7 +162,7 @@
     if (!plano) return {
       erro: "Prazo sem regra cadastrada na tabela para a faixa de entrada informada."
     };
-    const v = validaBaloes(baloes2, prazo);
+    const v = validaBaloes(baloes, prazo);
     if ("erro" in v) return v;
     if (v.lista.length > MAX_BALOES_TRADICIONAL) return {
       erro: `Escolha at\xE9 ${MAX_BALOES_TRADICIONAL} bal\xF5es.`
@@ -327,12 +326,23 @@
   }
 
   // supabase/functions/brabus-intelligence/engine/assistente.ts
+  function campanhasPermitidas(rebate, bonusTradeIn) {
+    if (!rebate) return {
+      taxa_subsidiada: false,
+      coparticipado: false
+    };
+    return {
+      taxa_subsidiada: true,
+      coparticipado: !bonusTradeIn
+    };
+  }
   var CONFIG_PADRAO = {
     balao_pct: 0.3,
     limite_renda: 0.3,
-    cdi_aa: null,
-    ir_faixas: [],
-    campanhas_liberadas: false
+    campanhas: {
+      taxa_subsidiada: false,
+      coparticipado: false
+    }
   };
   function perfilDasRespostas(r) {
     return {
@@ -342,74 +352,44 @@
       avista: "A_VISTA"
     }[r.prioridade];
   }
-  function cetEstimado(financiado, pagamentos) {
-    if (!(financiado > 0) || !pagamentos.length) return null;
-    const vp = (i) => pagamentos.reduce((s, p) => s + p.valor / Math.pow(1 + i, p.mes), 0) - financiado;
-    if (vp(0) < 0) return null;
-    let lo = 0, hi = 1;
-    for (let k = 0; k < 200; k++) {
-      const mid = (lo + hi) / 2;
-      if (vp(mid) > 0) lo = mid;
-      else hi = mid;
-    }
-    return (lo + hi) / 2;
-  }
-  function aliquotaIr(faixas, dias) {
-    const ord = [
-      ...faixas
-    ].sort((a, b) => (a.ate_dias ?? Infinity) - (b.ate_dias ?? Infinity));
-    const f = ord.find((x) => x.ate_dias === null || dias <= x.ate_dias);
-    return f ? f.aliquota_pct / 100 : null;
-  }
-  var aa = (am) => am === null ? null : Math.pow(1 + am, 12) - 1;
   var ehErro = (x) => !!x && typeof x === "object" && "erro" in x;
-  function cand(c, valor) {
-    const pagamentos = [];
-    for (let m = 1; m <= c.prazo; m++) pagamentos.push({
-      mes: m,
-      valor: c.parcela
-    });
-    for (const b of c.baloes) pagamentos.push({
-      mes: b.mes,
-      valor: b.valor
-    });
-    const total_pago = c.entrada + pagamentos.reduce((s, p) => s + p.valor, 0);
+  var brl0 = (v) => v.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0
+  });
+  function cand(c) {
     return {
       ...c,
-      pagamentos,
-      total_pago,
-      juros: total_pago - valor,
-      cet_am: cetEstimado(c.financiado, pagamentos)
+      custo: c.entrada + c.parcela * c.prazo + c.baloes.reduce((s, b) => s + b.valor, 0)
     };
   }
-  function baloes(e, entrada, cfg) {
-    const out = [];
-    const fin = e.valor - entrada;
-    for (const est of BALAO_PREFERIDAS) {
-      const base = balaoTradicional(e.valor, entrada, est.prazo, [], e.tabelas);
-      if (ehErro(base)) continue;
-      const valorBalao = Math.min(Math.round(fin * cfg.balao_pct), Math.floor(base.limiteBaloes));
-      if (!(valorBalao > 0)) continue;
-      const bs = [
+  function balao(e, entrada, prazo, mes, nome, valorBalao) {
+    const sim = balaoTradicional(e.valor, entrada, prazo, [
+      {
+        mes,
+        valor: valorBalao
+      }
+    ], e.tabelas);
+    if (ehErro(sim)) return null;
+    return cand({
+      plano: "BALAO",
+      plano_nome: `Plano Bal\xE3o \u2014 ${nome}`,
+      prazo,
+      entrada,
+      financiado: sim.financiado,
+      parcela: sim.parcela,
+      baloes: [
         {
-          mes: est.meses[0],
+          mes,
           valor: valorBalao
         }
-      ];
-      const sim = balaoTradicional(e.valor, entrada, est.prazo, bs, e.tabelas);
-      if (ehErro(sim)) continue;
-      out.push(cand({
-        plano: "BALAO",
-        plano_nome: `Plano Bal\xE3o \u2014 ${est.nome}`,
-        prazo: est.prazo,
-        entrada,
-        financiado: fin,
-        parcela: sim.parcela,
-        baloes: bs,
-        taxa: sim.taxa
-      }, e.valor));
-    }
-    return out;
+      ]
+    });
+  }
+  function limiteBalao(e, entrada, prazo) {
+    const base = balaoTradicional(e.valor, entrada, prazo, [], e.tabelas);
+    return ehErro(base) ? null : base.limiteBaloes;
   }
   function opcoesMensais(e, entrada, comBalao, cfg) {
     const out = [];
@@ -423,27 +403,33 @@
           entrada,
           financiado: lin.financiado,
           parcela: it.parcela,
-          baloes: [],
-          taxa: it.taxa
-        }, e.valor));
+          baloes: []
+        }));
       }
     }
-    if (comBalao) out.push(...baloes(e, entrada, cfg));
-    if (cfg.campanhas_liberadas) {
+    if (comBalao) for (const est of BALAO_PREFERIDAS) {
+      const lim = limiteBalao(e, entrada, est.prazo);
+      if (lim === null) continue;
+      const v = Math.min(Math.round((e.valor - entrada) * cfg.balao_pct), Math.floor(lim));
+      const b = v > 0 ? balao(e, entrada, est.prazo, est.meses[0], est.nome, v) : null;
+      if (b) out.push(b);
+    }
+    if (cfg.campanhas.taxa_subsidiada) {
       const sub = taxasSubsidiadas(e.valor, entrada, 0, e.tabelas);
       if (!ehErro(sub)) for (const l of sub.linhas) {
         out.push(cand({
           plano: "TAXA_SUBSIDIADA",
-          plano_nome: `Taxa Subsidiada ${(l.taxa * 100).toFixed(2).replace(".", ",")}%`,
+          plano_nome: "Taxa Subsidiada",
           prazo: l.prazo,
-          // Acima de 24x o Simulador soma R$ 2.500 de tarifa do banco (obrigatória): fica na conta e entra no CET.
+          variante: String(l.taxa),
           entrada,
           financiado: sub.financiado,
           parcela: l.parcela,
-          baloes: [],
-          taxa: l.taxa
-        }, e.valor));
+          baloes: []
+        }));
       }
+    }
+    if (cfg.campanhas.coparticipado) {
       const nome = casaModelo(e.modelo, e.versao, e.tabelas.copartModels.map((m) => m.name));
       if (nome) {
         const cp = coparticipado(nome, e.valor, entrada, e.tabelas);
@@ -456,9 +442,8 @@
               entrada,
               financiado: cp.financiado,
               parcela: x.parcela,
-              baloes: [],
-              taxa: x.taxa
-            }, e.valor));
+              baloes: []
+            }));
           }
         }
       }
@@ -469,12 +454,13 @@
     const out = [
       e.entrada
     ];
-    if (!cfg.campanhas_liberadas || perfil === "LIQUIDEZ" || r.dinheiro !== "sim" || !(r.dinheiro_extra > 0)) return out;
-    const minimos = [
-      0.5
-    ];
-    const cp = casaModelo(e.modelo, e.versao, e.tabelas.copartModels.map((m) => m.name));
-    if (cp) minimos.push(e.tabelas.copartModels.find((m) => m.name === cp).entry);
+    if (perfil === "LIQUIDEZ" || r.dinheiro !== "sim" || !(r.dinheiro_extra > 0)) return out;
+    const minimos = [];
+    if (cfg.campanhas.taxa_subsidiada) minimos.push(0.5);
+    if (cfg.campanhas.coparticipado) {
+      const cp = casaModelo(e.modelo, e.versao, e.tabelas.copartModels.map((m) => m.name));
+      if (cp) minimos.push(e.tabelas.copartModels.find((m) => m.name === cp).entry);
+    }
     for (const p of minimos) {
       const ent = Math.ceil(e.valor * p);
       if (ent > e.entrada && ent <= e.entrada + r.dinheiro_extra && ent < e.valor) out.push(ent);
@@ -483,13 +469,17 @@
       ...new Set(out)
     ];
   }
-  var chave = (c) => `${c.plano}|${c.plano_nome}|${c.prazo}|${c.entrada}|${c.baloes.map((b) => `${b.mes}:${b.valor}`).join(",")}`;
-  var porTotal = (a, b) => a.total_pago - b.total_pago || a.parcela - b.parcela || a.prazo - b.prazo || (chave(a) < chave(b) ? -1 : 1);
-  var porParcela = (a, b) => a.parcela - b.parcela || a.total_pago - b.total_pago || a.prazo - b.prazo || (chave(a) < chave(b) ? -1 : 1);
+  var chave = (c) => `${c.plano}|${c.variante ?? ""}|${c.prazo}|${c.entrada}|${c.baloes.map((b) => `${b.mes}:${b.valor}`).join(",")}`;
+  var porCusto = (a, b) => a.custo - b.custo || a.parcela - b.parcela || a.prazo - b.prazo || (chave(a) < chave(b) ? -1 : 1);
+  var porParcela = (a, b) => a.parcela - b.parcela || a.custo - b.custo || a.prazo - b.prazo || (chave(a) < chave(b) ? -1 : 1);
   function montarTresPropostas(e, r, config = {}) {
     const cfg = {
       ...CONFIG_PADRAO,
-      ...config
+      ...config,
+      campanhas: {
+        ...CONFIG_PADRAO.campanhas,
+        ...config.campanhas ?? {}
+      }
     };
     if (!(e.valor > 0)) return {
       erro: "Informe o valor do ve\xEDculo."
@@ -500,41 +490,62 @@
     if (!(cfg.balao_pct > 0 && cfg.balao_pct < 1)) return {
       erro: "Bal\xE3o padr\xE3o inv\xE1lido na configura\xE7\xE3o."
     };
+    if (r.parcela_max !== null && !(r.parcela_max > 0)) return {
+      erro: "Parcela confort\xE1vel inv\xE1lida."
+    };
     const perfil = perfilDasRespostas(r);
-    const cabe = (c) => r.parcela_max === null || c.parcela <= r.parcela_max + 1e-9;
-    const base = opcoesMensais(e, e.entrada, r.troca === "sim", cfg);
+    const max = r.parcela_max;
+    const cabe = (c) => max === null || c.parcela <= max + 1e-9;
+    const comBalao = r.troca === "sim";
+    const base = opcoesMensais(e, e.entrada, comBalao, cfg);
     if (!base.length) return {
       erro: "Nenhum plano do Simulador de Novos calcula para este valor e esta entrada."
     };
     const todas = entradasAvaliadas(e, r, perfil, cfg).flatMap((ent) => ent === e.entrada ? base : opcoesMensais(e, ent, false, cfg));
+    const baseCabe = base.filter(cabe), todasCabem = todas.filter(cabe);
+    const ctx = {
+      e,
+      r,
+      cfg,
+      max,
+      perfil
+    };
+    if (!todasCabem.length) {
+      const perto = [
+        ...todas
+      ].sort(porParcela)[0];
+      const falta = perto.parcela - max;
+      return resultado(ctx, [
+        prop(ctx, perto, "mais_perto", "Mais perto do que o cliente pediu", false, `Faltam ${brl0(Math.ceil(falta))} por m\xEAs para caber em ${brl0(max)}.`)
+      ], todas.length, true, falta, paraCaber(ctx, comBalao));
+    }
     const usadas = /* @__PURE__ */ new Set();
     const pega = (lista) => {
       const c = lista.find((x) => !usadas.has(chave(x))) ?? null;
       if (c) usadas.add(chave(c));
       return c;
     };
-    const jPool = todas.filter(cabe);
     const menosJuros = pega([
-      ...jPool.length ? jPool : todas
-    ].sort(porTotal));
-    const maisLeveBase = [
-      ...base
-    ].sort(porParcela)[0];
-    if (menosJuros.entrada === e.entrada && menosJuros.parcela <= maisLeveBase.parcela + 1e-9) {
-      return dominante(e, r, cfg, perfil, todas, base, menosJuros, cabe);
+      ...todasCabem
+    ].sort(porCusto));
+    const maisLeve = baseCabe.length ? [
+      ...baseCabe
+    ].sort(porParcela)[0] : null;
+    if (!maisLeve || menosJuros.entrada === e.entrada && menosJuros.parcela <= maisLeve.parcela + 1e-9) {
+      return dominante(ctx, todasCabem, baseCabe, menosJuros, todas.length);
     }
     const leve = pega([
-      ...base
+      ...baseCabe
     ].sort(porParcela));
     let meio = null, rotuloMeio = "Equil\xEDbrio";
     if (leve) {
-      const naFaixa = base.filter((c) => cabe(c) && !usadas.has(chave(c)));
-      const fronteira = naFaixa.filter((c) => !base.some((o) => o !== c && o.parcela <= c.parcela && o.total_pago <= c.total_pago && (o.parcela < c.parcela || o.total_pago < c.total_pago))).filter((c) => c.parcela > leve.parcela && c.parcela < menosJuros.parcela && c.total_pago < leve.total_pago && c.total_pago > menosJuros.total_pago).sort(porParcela);
+      const livres = baseCabe.filter((c) => !usadas.has(chave(c)));
+      const fronteira = livres.filter((c) => !baseCabe.some((o) => o !== c && o.parcela <= c.parcela && o.custo <= c.custo && (o.parcela < c.parcela || o.custo < c.custo))).filter((c) => c.parcela > leve.parcela && c.parcela < menosJuros.parcela && c.custo < leve.custo && c.custo > menosJuros.custo).sort(porParcela);
       if (fronteira.length) meio = pega([
         fronteira[Math.floor((fronteira.length - 1) / 2)]
       ]);
       if (!meio && leve.plano === "BALAO" && menosJuros.plano === "BALAO") {
-        meio = pega(naFaixa.filter((c) => c.plano !== "BALAO").sort(porTotal));
+        meio = pega(livres.filter((c) => c.plano !== "BALAO").sort(porCusto));
         if (meio) rotuloMeio = "Sem bal\xE3o";
       }
     }
@@ -545,44 +556,86 @@
       LIQUIDEZ: meioEquilibrio ? "meio" : "menos_juros",
       A_VISTA: null
     };
-    const propostas = [];
-    if (leve) propostas.push(montaProposta(e, r, cfg, cabe, leve, "leve", "Parcela mais leve", destaque[perfil] === "leve"));
-    if (meio) propostas.push(montaProposta(e, r, cfg, cabe, meio, "meio", rotuloMeio, destaque[perfil] === "meio"));
-    propostas.push(montaProposta(e, r, cfg, cabe, menosJuros, "menos_juros", "Menos juros", destaque[perfil] === "menos_juros"));
-    return resultado(e, cfg, perfil, propostas, todas.length, !base.some(cabe), leve ?? menosJuros, menosJuros);
+    const lim = max === null ? "" : ` em ${brl0(max)}`;
+    const props = [];
+    if (leve) props.push(prop(ctx, leve, "leve", "Parcela mais leve", destaque[perfil] === "leve", `\xC9 a menor parcela entre as op\xE7\xF5es que cabem${lim}.`));
+    if (meio) props.push(prop(ctx, meio, "meio", rotuloMeio, destaque[perfil] === "meio", rotuloMeio === "Sem bal\xE3o" ? `Sem bal\xE3o no fim, com parcela que cabe${lim}.` : `Meio-termo: parcela menor que a de menos juros e custo menor que o da mais leve.`));
+    props.push(prop(ctx, menosJuros, "menos_juros", "Menos juros", destaque[perfil] === "menos_juros", `Cabe${lim} e \xE9 a que menos custa no total.`));
+    return resultado(ctx, props, todas.length, false, null, []);
   }
-  function dominante(e, r, cfg, perfil, todas, base, melhor, cabe) {
+  function dominante(ctx, todasCabem, baseCabe, melhor, avaliadas) {
     const campanha = melhor.plano === "TAXA_SUBSIDIADA" || melhor.plano === "COPARTICIPADO";
     const outra = (c) => melhor.plano === "BALAO" ? c.plano !== "BALAO" : campanha ? c.plano === "LINEAR" || c.plano === "BALAO" : c.plano !== melhor.plano;
     const prefixo = melhor.plano === "BALAO" ? "Sem bal\xE3o" : campanha ? "Sem campanha" : "Outro plano";
-    const altBase = base.filter(outra), altTodas = todas.filter(outra);
-    const propostas = [
-      montaProposta(e, r, cfg, cabe, melhor, "melhor", "Mais leve e menos juros", perfil !== "A_VISTA")
+    const lim = ctx.max === null ? "" : ` em ${brl0(ctx.max)}`;
+    const props = [
+      prop(ctx, melhor, "melhor", "Mais leve e menos juros", ctx.perfil !== "A_VISTA", `Cabe${lim} com a menor parcela e tamb\xE9m o menor custo entre as op\xE7\xF5es.`)
     ];
-    const altLeve = [
-      ...altBase
-    ].sort(porParcela)[0];
-    const jPool = altTodas.filter(cabe);
-    const altJuros = [
-      ...jPool.length ? jPool : altTodas
-    ].sort(porTotal)[0];
-    if (altLeve) propostas.push(montaProposta(e, r, cfg, cabe, altLeve, "leve", `${prefixo} \xB7 parcela mais leve`, false));
-    if (altJuros && (!altLeve || chave(altJuros) !== chave(altLeve))) propostas.push(montaProposta(e, r, cfg, cabe, altJuros, "menos_juros", `${prefixo} \xB7 menos juros`, false));
-    if (propostas.length === 1) {
-      const resto = todas.filter((c) => chave(c) !== chave(melhor)).sort(porTotal)[0];
-      if (resto) propostas.push(montaProposta(e, r, cfg, cabe, resto, "menos_juros", cabe(resto) ? "Outra op\xE7\xE3o \xB7 menos juros" : "Acima da parcela confort\xE1vel \xB7 menos juros", false));
+    const altLeve = baseCabe.filter(outra).sort(porParcela)[0];
+    const altJuros = todasCabem.filter(outra).sort(porCusto)[0];
+    if (altLeve) props.push(prop(ctx, altLeve, "leve", `${prefixo} \xB7 parcela mais leve`, false, `${prefixo}: a menor parcela que cabe${lim}.`));
+    if (altJuros && (!altLeve || chave(altJuros) !== chave(altLeve))) props.push(prop(ctx, altJuros, "menos_juros", `${prefixo} \xB7 menos juros`, false, `${prefixo}: cabe${lim} e \xE9 a que menos custa no total.`));
+    if (props.length === 1) {
+      const resto = todasCabem.filter((c) => chave(c) !== chave(melhor)).sort(porCusto)[0];
+      if (resto) props.push(prop(ctx, resto, "menos_juros", "Outra op\xE7\xE3o", false, `Tamb\xE9m cabe${lim}.`));
     }
-    return resultado(e, cfg, perfil, propostas, todas.length, !base.some(cabe), melhor, melhor);
+    return resultado(ctx, props, avaliadas, false, null, []);
   }
-  function montaProposta(e, r, cfg, cabe, c, coluna, rotulo, destaque) {
-    const aliq = cfg.cdi_aa === null ? null : aliquotaIr(cfg.ir_faixas, c.prazo * 30);
-    const rendimento = cfg.cdi_aa === null || aliq === null ? null : cfg.cdi_aa * (1 - aliq);
-    const rm = rendimento === null ? null : Math.pow(1 + rendimento, 1 / 12) - 1;
-    const vp = rm === null ? null : c.entrada + c.pagamentos.reduce((s, p) => s + p.valor / Math.pow(1 + rm, p.mes), 0);
-    const rendaPct = r.renda && r.renda > 0 ? c.parcela / r.renda : null;
+  function paraCaber(ctx, comBalao) {
+    const { e, cfg, max } = ctx;
+    const out = [];
+    const cabeCom = (ent) => opcoesMensais(e, ent, comBalao, cfg).filter((c) => c.parcela <= max + 1e-9);
+    const maxEnt = Math.floor((e.valor - 1) / 100) * 100;
+    if (maxEnt > e.entrada && cabeCom(maxEnt).length) {
+      let lo = e.entrada, hi = maxEnt;
+      while (hi - lo > 100) {
+        const mid = Math.round((lo + hi) / 200) * 100;
+        if (mid <= lo || mid >= hi) break;
+        if (cabeCom(mid).length) hi = mid;
+        else lo = mid;
+      }
+      const c = cabeCom(hi).sort(porCusto)[0];
+      out.push({
+        tipo: "entrada",
+        valor: hi - e.entrada,
+        texto: `Com ${brl0(hi - e.entrada)} a mais de entrada, em ${c.prazo} meses.`,
+        proposta: prop(ctx, c, "mais_perto", "Com mais entrada", false, `Cabe em ${brl0(max)} com entrada de ${brl0(hi)}.`)
+      });
+    }
+    const est = BALAO_PREFERIDAS.find((x) => x.meses[0] === x.prazo && x.prazo === 48) ?? BALAO_PREFERIDAS[0];
+    const lim = limiteBalao(e, e.entrada, est.prazo);
+    if (lim !== null) {
+      const teto = Math.floor(lim / 100) * 100;
+      const ok = (v) => {
+        const b = balao(e, e.entrada, est.prazo, est.meses[0], est.nome, v);
+        return b && b.parcela <= max + 1e-9 ? b : null;
+      };
+      if (teto > 0 && ok(teto)) {
+        let lo = 0, hi = teto;
+        while (hi - lo > 100) {
+          const mid = Math.round((lo + hi) / 200) * 100;
+          if (mid <= lo || mid >= hi) break;
+          if (ok(mid)) hi = mid;
+          else lo = mid;
+        }
+        const b = ok(hi);
+        out.push({
+          tipo: "balao",
+          valor: hi,
+          texto: `Com bal\xE3o de ${brl0(hi)} no fim (${est.prazo}x, bal\xE3o na ${est.meses[0]}\xAA parcela).`,
+          proposta: prop(ctx, b, "mais_perto", "Com bal\xE3o no fim", false, `Cabe em ${brl0(max)} deixando ${brl0(hi)} para a \xFAltima parcela.`)
+        });
+      }
+    }
+    return out;
+  }
+  function prop(ctx, c, coluna, rotulo, destaque, motivo) {
+    const extra = Math.max(0, c.entrada - ctx.e.entrada);
+    const m = motivo + (extra > 0 && coluna !== "mais_perto" ? ` Usa ${brl0(extra)} do dinheiro extra para chegar \xE0 entrada m\xEDnima da campanha.` : "");
     return {
       coluna,
       rotulo,
+      motivo: m,
       plano: c.plano,
       plano_nome: c.plano_nome,
       prazo: c.prazo,
@@ -590,57 +643,30 @@
       financiado: c.financiado,
       parcela: c.parcela,
       baloes: c.baloes,
-      taxa_am: c.taxa,
-      taxa_aa: aa(c.taxa),
-      cet_am: c.cet_am,
-      cet_aa: aa(c.cet_am),
-      total_pago: c.total_pago,
-      juros: c.juros,
-      a_vista: {
-        valor: e.valor,
-        diferenca_total: c.total_pago - e.valor,
-        custo_valor_presente: vp,
-        diferenca_valor_presente: vp === null ? null : vp - e.valor,
-        rendimento_aa: rendimento,
-        aliquota_ir: aliq
-      },
-      alertas: {
-        acima_da_parcela_max: !cabe(c),
-        renda_pct: rendaPct,
-        renda_alta: rendaPct !== null && rendaPct > cfg.limite_renda
-      },
-      usa_dinheiro_extra: Math.max(0, c.entrada - e.entrada),
+      usa_dinheiro_extra: extra,
       destaque
     };
   }
-  function resultado(e, cfg, perfil, propostas, avaliadas, nenhumaCabe, ref, menosJuros) {
+  function resultado(ctx, propostas, avaliadas, nenhuma, falta, para) {
+    const renda = ctx.r.renda;
     return {
-      perfil,
+      perfil: ctx.perfil,
       propostas,
+      nenhuma_cabe: nenhuma,
+      falta_por_mes: falta,
+      para_caber: para,
+      alerta_renda: !!renda && renda > 0 && propostas.some((p) => p.parcela / renda > ctx.cfg.limite_renda),
       opcoes_avaliadas: avaliadas,
-      nenhuma_cabe: nenhumaCabe,
-      a_vista_mais_barata: propostas.some((p) => p.a_vista.custo_valor_presente === null) ? null : propostas.every((p) => p.a_vista.custo_valor_presente > e.valor),
-      abaixo_do_a_vista: propostas.filter((p) => p.a_vista.custo_valor_presente !== null && p.a_vista.custo_valor_presente < e.valor).map((p) => p.rotulo),
-      diferencas: {
-        leve_para_menos_juros: {
-          parcela: menosJuros.parcela - ref.parcela,
-          total_pago: ref.total_pago - menosJuros.total_pago
-        }
-      },
       criterios: [
-        "Parcela mais leve: menor parcela mensal com a entrada digitada.",
-        "Menos juros: menor total pago entre as op\xE7\xF5es que cabem na parcela confort\xE1vel.",
-        "Equil\xEDbrio: op\xE7\xE3o que nenhuma outra supera ao mesmo tempo em parcela e em total pago, entre as duas pontas.",
-        "Se uma op\xE7\xE3o vence nas duas pontas, ela aparece sozinha em destaque, com alternativas de outra estrutura.",
+        "Todas as propostas cabem na parcela confort\xE1vel; se nada couber, a mais perto e o que falta para caber.",
+        "Parcela mais leve: menor parcela. Menos juros: menor custo somando entrada, parcelas e bal\xE3o. Equil\xEDbrio: entre as duas, sem perder nas duas.",
+        "Parcelas iguais \xE0s do Simulador (seguro prestamista dentro no Bal\xE3o e no Coparticipado).",
         "Rebate, valor final de venda, retorno e comiss\xE3o n\xE3o entram na escolha. O Plano Bal\xE3o n\xE3o tem prioridade.",
-        "Parcelas iguais \xE0s do Simulador: no Bal\xE3o e no Coparticipado o seguro prestamista vem dentro da parcela e do CET.",
-        "Linear com o mesmo c\xE1lculo do Simulador.",
-        "Conta \xE0 vista: CDI das Refer\xEAncias de Mercado, l\xEDquido do IR da faixa do prazo de cada proposta.",
-        "CET estimado; o oficial vem no contrato do banco."
+        "Campanhas: sem rebate, nenhuma; com b\xF4nus de trade-in, s\xF3 a Taxa Subsidiada."
       ]
     };
   }
 
-  // ../../Users/luis9/AppData/Local/Temp/37d3bc98e360c3fd/entrada.ts
+  // ../../Users/luis9/AppData/Local/Temp/e8145c69bea4a715/entrada.ts
   globalThis.NX_ASSISTENTE_REGRA = assistente_exports;
 })();

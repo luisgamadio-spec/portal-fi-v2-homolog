@@ -89,3 +89,9 @@ body.asstAberto .baiLauncherRoot { display: none; }   /* o botão flutuante da B
 @media (max-width: 480px) { .asstEscolhaDupla { grid-template-columns: minmax(0, 1fr); } }
 .asstOk { margin: 0; font-size: .8rem; color: var(--color-success); }
 @media (prefers-reduced-motion: no-preference) { .asstChip, .asstBar { transition: background-color .12s, border-color .12s; } }
+/* 31/10/2026: cartão só com plano, entrada, parcela, prazo, balão e a frase; "para caber" quando nada cabe. */
+.asstMotivo { margin: 0; font-size: .8rem; color: var(--color-text-secondary); border-left: 2px solid var(--color-hairline-strong); padding: 2px 0 2px 10px; }
+.asstCardDestaque .asstMotivo { border-left-color: var(--color-success); }
+.asstCardsUm { grid-template-columns: minmax(0, 420px); }
+.asstCaber { display: grid; gap: 10px; }
+.asstCaber > b { font-size: .9rem; color: var(--color-text-primary); }

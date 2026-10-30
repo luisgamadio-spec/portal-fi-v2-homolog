@@ -1,10 +1,9 @@
 /* Assistente de solução financeira — Simulador de Novos (Fase 2, 30/10/2026; plano e decisões do Luis de 29–30/10).
    - Botão "Encontrar a melhor solução" sempre visível nos planos com valor do bem e entrada; pop-up de reforço depois de N mudanças
      (assist_config.popup_mudancas), no máximo 1 vez por visita ao simulador.
-   - 4 perguntas de toque (31/10: a antiga 5ª, "esse dinheiro rende?", saiu: "tenho, mas prefiro não mexer" já diz isso);
-     o vendedor marca antes se as campanhas estão liberadas para o cliente.
-   - Conta "à vista ou financiar": CDI das Referências de Mercado do Master (cash_referencias_mercado), líquido do IR da faixa
-     do prazo de cada proposta; mostra a data da referência e o nome das propostas que custam menos que pagar à vista.
+   - 4 perguntas ao cliente e, no fim, 1 ou 2 só para o vendedor (rebate? bônus de trade-in?) — 31/10/2026.
+   - Só propostas dentro da parcela confortável; se nada couber, a mais perto e o que falta (entrada/prazo/balão).
+   - Cada proposta mostra só plano, entrada, parcela, prazo, balão e uma frase (simulação aproximada com taxas base).
    - TODOS os números vêm de window.NX_ASSISTENTE_REGRA (gerado de engine/assistente.ts, a mesma regra testada na função) com as
      tabelas vigentes do próprio simulador. Este arquivo não faz conta de financiamento: só formata o que a regra devolve.
    - (31/10) Seguro prestamista: no Balão e no Coparticipado vem dentro da parcela, exatamente como no Simulador (e no CET);
@@ -32,7 +31,7 @@
     { id: 'troca', q: 'Pretende trocar de carro em 2 ou 3 anos?', opts: [['sim', 'Sim, troco logo'], ['nao', 'Não, vou ficar bastante tempo'], ['nao_sei', 'Ainda não sei']] },
     { id: 'dinheiro', q: 'Além da entrada, tem algum dinheiro que poderia usar?', opts: [['nao', 'Não'], ['sim', 'Sim'], ['nao_mexer', 'Tenho, mas prefiro deixar aplicado']] }
   ];
-  var TXT_PERGUNTAS = PERGUNTAS.length + ' perguntas rápidas';
+  var TXT_PERGUNTAS = PERGUNTAS.length + ' perguntas rápidas ao cliente';
   var PERFIL_NOME = { PARCELA: 'Parcela', CUSTO_TOTAL: 'Custo total', LIQUIDEZ: 'Liquidez', A_VISTA: 'À vista' };
 
   // ---------- utilidades ----------
@@ -151,19 +150,23 @@
   function novaVisita(p) { pagina = p; popupMostrado = false; mudancas = 0; sessao = null; fechar(); }
 
   // ---------- fluxo ----------
+  // 31/10/2026 (teste do Luis no homolog): 4 perguntas ao cliente e, no fim, 1 ou 2 só para o vendedor (rebate? bônus de trade-in?).
+  // Cada proposta mostra só plano, entrada, parcela, prazo, balão e a frase da regra. O simulador é aproximado (taxas base).
+  var VENDEDOR = [
+    { id: 'rebate', q: 'É possível usar rebate neste caso?', opts: [['nao', 'Não'], ['sim', 'Sim']] },
+    { id: 'tradein', q: 'Está sendo usado bônus de trade-in?', opts: [['nao', 'Não'], ['sim', 'Sim']], so: function (v) { return v.rebate === 'sim'; } }
+  ];
   function abrir(origem) {
     if (!preenchido()) return;
     garantirSessao(true);
     if (!sessao.oferecido) oferecer(origem);
     registrar('aberto', { origem: origem });
     sessao.aberto = true;
-    st = { passo: 'antes', idx: 0, origem: origem, resp: { prioridade: null, faixa: null, outroValor: '', renda: '', troca: null, dinheiro: null, dinheiroValor: '' }, ref: null,
-      campanhas: false, modelo: '', tab: null, copart: false, carregando: true, erro: null, res: null, escolha: null, resultado: null };
+    st = { passo: 'pergunta', idx: 0, origem: origem, resp: { prioridade: null, faixa: null, outroValor: '', renda: '', troca: null, dinheiro: null, dinheiroValor: '' },
+      vend: { rebate: null, tradein: null }, modelo: '', tab: null, copart: false, carregando: true, erro: null, res: null, escolha: null, resultado: null };
     montarJanela();
-    // Referências de Mercado (Cash Conversion, mantidas pelo Master): sem elas, só a conta à vista some.
-    var ref = rpc('cash_referencias_mercado', {}).then(function (r) { return r && r.cdi_aa ? r : null; }, function () { return null; });
-    Promise.all([pagina.tabelas(), ref]).then(function (x) { var t = x[0]; if (!st) return; st.tab = t.tabelas; st.copart = t.copart; st.ref = x[1]; st.carregando = false; desenhar(); },
-      function () { st.carregando = false; st.erro = 'Não foi possível carregar as condições vigentes do simulador. Tente novamente.'; desenhar(); });
+    pagina.tabelas().then(function (t) { if (!st) return; st.tab = t.tabelas; st.copart = t.copart; st.carregando = false; desenhar(); },
+      function () { if (!st) return; st.carregando = false; st.erro = 'Não foi possível carregar as condições vigentes do simulador. Tente novamente.'; desenhar(); });
   }
   function montarJanela() {
     fechar(true);
@@ -186,7 +189,7 @@
     document.removeEventListener('keydown', teclaEsc);
     if (!semLimpar) st = null;
   }
-  function perguntasVisiveis() { return PERGUNTAS; }
+  function vendVisiveis() { return VENDEDOR.filter(function (q) { return !q.so || q.so(st.vend); }); }
 
   function desenhar() {
     var body = document.getElementById('asstBody');
@@ -194,8 +197,8 @@
     var html;
     if (st.carregando) html = '<div class="emptyState">Carregando as condições vigentes do simulador...</div>';
     else if (st.erro) html = '<div class="errorState">' + esc(st.erro) + '</div><div class="asstNav"><button type="button" class="btn btn-secondary" data-a="fechar">Fechar</button></div>';
-    else if (st.passo === 'antes') html = antesHtml();
     else if (st.passo === 'pergunta') html = perguntaHtml();
+    else if (st.passo === 'vendedor') html = vendedorHtml();
     else if (st.passo === 'resultado') html = resultadoHtml();
     else html = finalHtml();
     body.innerHTML = html;
@@ -213,77 +216,66 @@
   function resumoTopo() {
     return '<p class="asstContexto">Valor do bem <b>' + brl(pagina.valor()) + '</b> · entrada <b>' + brl(pagina.entrada()) + '</b></p>';
   }
-  function antesHtml() {
-    var modelos = (st.tab && st.tab.copartModels || []).map(function (m) { return m.name; });
-    var sel = st.campanhas ? '<div class="field"><label for="asstModelo">Modelo (para o Plano Coparticipado)</label><select id="asstModelo" class="asstSelect">' +
-      '<option value="">Outro modelo / não sei</option>' + modelos.map(function (n) { return '<option' + (st.modelo === n ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') +
-      '</select>' + (st.copart ? '' : '<span class="hint">O Coparticipado não carregou agora; só a Taxa Subsidiada entra.</span>') + '</div>' : '';
-    return resumoTopo() + '<span class="asstHint">Antes de começar · só para você</span>' +
-      '<p class="asstQ">As campanhas (Taxa Subsidiada, Coparticipado) estão liberadas para este cliente?</p>' +
-      chipsHtml('campanhas', [['nao', 'Não'], ['sim', 'Sim, estão liberadas']], st.campanhas ? 'sim' : 'nao') +
-      '<p class="asstSub">Se liberadas, elas concorrem com os outros planos só pelos números do cliente.</p>' + sel +
-      '<div class="asstNav"><button type="button" class="btn btn-secondary" data-a="fechar">Cancelar</button><button type="button" class="btn btn-primary" data-a="comecar" data-foco>Começar as perguntas</button></div>';
-  }
   function perguntaHtml() {
-    var qs = perguntasVisiveis(), q = qs[st.idx], r = st.resp;
-    var extra = '';
+    var q = PERGUNTAS[st.idx], r = st.resp, extra = '';
     if (q.id === 'faixa') {
       if (r.faixa === 'outro') extra += '<div class="field"><label for="asstOutro">Parcela confortável (R$)</label><input id="asstOutro" class="asstInput" inputmode="decimal" placeholder="R$ 5.000,00" value="' + esc(r.outroValor) + '"></div>';
       extra += '<div class="field"><label for="asstRenda">Renda mensal do cliente (opcional, só para o alerta; não fica gravada)</label><input id="asstRenda" class="asstInput" inputmode="decimal" placeholder="R$ 0,00" value="' + esc(r.renda) + '"></div>';
     }
     if (q.id === 'dinheiro' && r.dinheiro === 'sim') extra = '<div class="field"><label for="asstDinheiro">Cerca de quanto (R$)?</label><input id="asstDinheiro" class="asstInput" inputmode="decimal" placeholder="R$ 50.000,00" value="' + esc(r.dinheiroValor) + '"></div>';
-    var bars = qs.map(function (_, i) { return '<i class="' + (i <= st.idx ? 'on' : '') + '"></i>'; }).join('');
-    var pode = !!r[q.id];
-    return resumoTopo() + '<div class="asstProgRow"><span class="asstHint">Pergunte ao cliente · ' + (st.idx + 1) + ' de ' + qs.length + '</span><span class="asstProg" aria-hidden="true">' + bars + '</span></div>' +
+    var bars = PERGUNTAS.map(function (_, i) { return '<i class="' + (i <= st.idx ? 'on' : '') + '"></i>'; }).join('');
+    return resumoTopo() + '<div class="asstProgRow"><span class="asstHint">Pergunte ao cliente · ' + (st.idx + 1) + ' de ' + PERGUNTAS.length + '</span><span class="asstProg" aria-hidden="true">' + bars + '</span></div>' +
       '<p class="asstQ">' + esc(q.q) + '</p>' + chipsHtml(q.id, q.opts, r[q.id]) + extra +
-      '<div class="asstNav"><button type="button" class="btn btn-secondary" data-a="voltar">Voltar</button><button type="button" class="btn btn-primary" data-a="proxima"' + (pode ? '' : ' disabled') + ' data-foco>' + (st.idx === qs.length - 1 ? 'Ver as propostas' : 'Próxima') + '</button></div>';
+      '<div class="asstNav"><button type="button" class="btn btn-secondary" data-a="voltar">' + (st.idx === 0 ? 'Cancelar' : 'Voltar') + '</button><button type="button" class="btn btn-primary" data-a="proxima"' + (r[q.id] ? '' : ' disabled') + ' data-foco>Próxima</button></div>';
+  }
+  function vendedorHtml() {
+    var qs = vendVisiveis(), q = qs[st.idx], v = st.vend, extra = '';
+    if (q.id === 'tradein' && v.tradein === 'nao') {
+      var modelos = (st.tab && st.tab.copartModels || []).map(function (m) { return m.name; });
+      extra = '<div class="field"><label for="asstModelo">Modelo (para o Plano Coparticipado)</label><select id="asstModelo" class="asstSelect">' +
+        '<option value="">Outro modelo / não sei</option>' + modelos.map(function (n) { return '<option' + (st.modelo === n ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') +
+        '</select>' + (st.copart ? '' : '<span class="hint">O Coparticipado não carregou agora; só a Taxa Subsidiada entra.</span>') + '</div>';
+    }
+    var regra = q.id === 'rebate' ? 'Sem rebate, a Taxa Subsidiada e o Coparticipado não entram.' : 'Com bônus de trade-in, o Coparticipado não pode ser oferecido; a Taxa Subsidiada pode.';
+    var ultima = st.idx === qs.length - 1 && (q.id === 'tradein' || v.rebate === 'nao');
+    return resumoTopo() + '<span class="asstHint">Só para você</span>' +
+      '<p class="asstQ">' + esc(q.q) + '</p>' + chipsHtml(q.id, q.opts, v[q.id]) + '<p class="asstSub">' + esc(regra) + '</p>' + extra +
+      '<div class="asstNav"><button type="button" class="btn btn-secondary" data-a="voltar">Voltar</button><button type="button" class="btn btn-primary" data-a="proxima"' + (v[q.id] ? '' : ' disabled') + ' data-foco>' + (ultima ? 'Ver as propostas' : 'Próxima') + '</button></div>';
   }
 
   function respostasRegra() {
     var r = st.resp, f = FAIXAS.filter(function (x) { return x[0] === r.faixa; })[0];
     var pm = r.faixa === 'outro' ? (parseBRL(r.outroValor) || null) : (f ? f[2] : null);
-    return {
-      prioridade: r.prioridade, parcela_max: pm, renda: parseBRL(r.renda) || null, troca: r.troca,
-      dinheiro: r.dinheiro, dinheiro_extra: r.dinheiro === 'sim' ? parseBRL(r.dinheiroValor) : 0,
-      rende: r.dinheiro === 'nao_mexer' ? 'sim' : null
-    };
+    return { prioridade: r.prioridade, parcela_max: pm, renda: parseBRL(r.renda) || null, troca: r.troca,
+      dinheiro: r.dinheiro, dinheiro_extra: r.dinheiro === 'sim' ? parseBRL(r.dinheiroValor) : 0 };
   }
   function calcular() {
+    var rebate = st.vend.rebate === 'sim', trade = rebate && st.vend.tradein === 'sim';
+    var camp = REGRA.campanhasPermitidas(rebate, trade);
     var res = REGRA.montarTresPropostas(
-      { modelo: st.campanhas ? st.modelo : '', versao: null, valor: pagina.valor(), entrada: pagina.entrada(), tabelas: st.tab },
-      respostasRegra(),
-      { balao_pct: cfg.balao_pct, limite_renda: cfg.limite_renda, campanhas_liberadas: !!st.campanhas,
-        cdi_aa: st.ref ? Number(st.ref.cdi_aa) / 100 : null, ir_faixas: st.ref && Array.isArray(st.ref.ir_faixas) ? st.ref.ir_faixas : [] });
+      { modelo: camp.coparticipado ? st.modelo : '', versao: null, valor: pagina.valor(), entrada: pagina.entrada(), tabelas: st.tab },
+      respostasRegra(), { balao_pct: cfg.balao_pct, limite_renda: cfg.limite_renda, campanhas: camp });
     st.res = res;
     if (res && !res.erro) {
       registrar('concluido', {
         perfil_cliente: res.perfil, faixa_parcela: st.resp.faixa, troca: st.resp.troca, dinheiro: st.resp.dinheiro,
-        campanhas_liberadas: !!st.campanhas, modelo: st.campanhas && st.modelo ? st.modelo : null,
-        alerta_renda: res.propostas.some(function (p) { return p.alertas.renda_alta; }), propostas_qtd: res.propostas.length
+        campanhas_liberadas: rebate, modelo: camp.coparticipado && st.modelo ? st.modelo : null,
+        alerta_renda: res.alerta_renda, propostas_qtd: Math.min(3, res.propostas.length)
       });
     }
   }
 
-  function cartaoHtml(p, i) {
-    var bal = p.baloes.length ? '<dt>Balão</dt><dd>' + brl(p.baloes[0].valor) + ' no mês ' + p.baloes[0].mes + '</dd>' : '';
-    var avisos = '';
-    if (p.usa_dinheiro_extra > 0) avisos += '<div class="asstNota info">Usa ' + brl0(p.usa_dinheiro_extra) + ' do dinheiro extra que o cliente disse ter, para chegar à entrada mínima da campanha.</div>';
-    if (p.taxa_am === 0) avisos += '<div class="asstNota info">Taxa 0% com CET estimado de ' + pct(p.cet_aa) + ' a.a. por IOF e tarifas. Se houver desconto para pagar à vista, compare com o preço à vista.</div>';
-    if (p.alertas.acima_da_parcela_max) avisos += '<div class="asstNota warn">Acima da parcela confortável que o cliente disse.</div>';
-    if (p.alertas.renda_alta) avisos += '<div class="asstNota warn">Esta parcela passa de ' + pct(cfg.limite_renda).replace(',00', '') + ' da renda informada (' + pct(p.alertas.renda_pct) + '). Vale conferir com o cliente se cabe com folga.</div>';
-    var av = p.a_vista;
+  function linhasHtml(p) {
+    return '<dl class="asstKv"><dt>Entrada</dt><dd>' + brl0(p.entrada) + '</dd><dt>Prazo</dt><dd>' + p.prazo + ' meses</dd>' +
+      (p.baloes.length ? '<dt>Balão</dt><dd>' + brl(p.baloes[0].valor) + ' na ' + p.baloes[0].mes + 'ª parcela</dd>' : '') + '</dl>';
+  }
+  function cartaoHtml(p, i, prefixo) {
     return '<article class="asstCard' + (p.destaque ? ' asstCardDestaque' : '') + '">' +
       '<div class="asstCardTop"><b>' + esc(p.rotulo) + '</b>' + (p.destaque ? '<span class="asstTag">Combina com o que o cliente disse</span>' : '') + '</div>' +
       '<div class="asstPlano">' + esc(p.plano_nome) + '</div>' +
-      '<div class="asstParcela">' + brl(p.parcela) + ' <small>× ' + p.prazo + '</small></div>' +
-      '<dl class="asstKv"><dt>Entrada</dt><dd>' + brl0(p.entrada) + '</dd>' + bal +
-      '<dt>Taxa</dt><dd>' + pct(p.taxa_am) + ' a.m. · ' + pct(p.taxa_aa) + ' a.a.</dd>' +
-      '<dt>CET estimado</dt><dd>' + pct(p.cet_am) + ' a.m. · ' + pct(p.cet_aa) + ' a.a.</dd>' +
-      '<dt class="sep"></dt><dd class="sep"></dd>' +
-      '<dt class="forte">Total pago</dt><dd class="forte">' + brl(p.total_pago) + '</dd>' +
-      '<dt>Juros e encargos</dt><dd>' + brl(p.juros) + '</dd>' +
-      '<dt>Comparado a pagar à vista</dt><dd>+' + brl0(av.diferenca_total) + '</dd></dl>' + avisos +
-      '<button type="button" class="btn btn-secondary asstEscolher" data-escolher="' + i + '">Cliente escolheu esta</button></article>';
+      '<div class="asstParcela">' + brl(p.parcela) + ' <small>× ' + p.prazo + '</small></div>' + linhasHtml(p) +
+      '<p class="asstMotivo">' + esc(p.motivo) + '</p>' +
+      '<button type="button" class="btn btn-secondary asstEscolher" data-escolher="' + prefixo + i + '">Cliente escolheu esta</button></article>';
   }
   function resultadoHtml() {
     var res = st.res;
@@ -294,46 +286,34 @@
     dito.push(r.troca === 'sim' ? 'troca em 2–3 anos' : (r.troca === 'nao' ? 'fica bastante tempo com o carro' : 'ainda não sabe quando troca'));
     if (r.dinheiro === 'sim' && r.dinheiro_extra > 0) dito.push('tem cerca de ' + brl0(r.dinheiro_extra) + ' além da entrada');
     if (r.dinheiro === 'nao_mexer') dito.push('não quer mexer na reserva');
-    if (st.campanhas) dito.push('campanhas liberadas');
-    var topo = res.perfil === 'A_VISTA' ? '<div class="asstAvista"><b>Pagar à vista: ' + brl0(pagina.valor()) + '</b><span>É a opção mais barata para este cliente. As propostas abaixo ficam como comparação, caso ele queira manter parte do dinheiro.</span>' +
-      '<button type="button" class="btn btn-secondary btn-sm" data-escolher="avista">Cliente vai pagar à vista</button></div>' : '';
-    var conta = '';
-    if (st.ref && res.a_vista_mais_barata !== null && (res.perfil === 'LIQUIDEZ' || res.perfil === 'A_VISTA' || r.dinheiro === 'sim' || r.dinheiro === 'nao_mexer')) {
-      var dataRef = String(st.ref.vigencia || '').split('-').reverse().join('/');
-      var lista = res.propostas.map(function (p) { return esc(p.rotulo) + ': ' + brl0(p.a_vista.custo_valor_presente) + ' (CDI líquido ' + pct(p.a_vista.rendimento_aa) + ')'; }).join(' · ');
-      var frase;
-      if (res.abaixo_do_a_vista.length) {
-        var abaixo = res.propostas.filter(function (p) { return res.abaixo_do_a_vista.indexOf(p.rotulo) >= 0; });
-        frase = abaixo.length === 1
-          ? '<b>' + esc(abaixo[0].rotulo) + '</b> custa ' + brl0(-abaixo[0].a_vista.diferenca_valor_presente) + ' menos que pagar à vista, em dinheiro de hoje.'
-          : abaixo.map(function (p) { return '<b>' + esc(p.rotulo) + '</b> (' + brl0(-p.a_vista.diferenca_valor_presente) + ' abaixo)'; }).join(' e ') + ' custam menos que pagar à vista, em dinheiro de hoje.';
-      } else {
-        var perto = res.propostas.slice().sort(function (a, b) { return a.a_vista.diferenca_valor_presente - b.a_vista.diferenca_valor_presente; })[0];
-        frase = 'Nenhuma proposta custa menos que pagar à vista. A mais próxima é <b>' + esc(perto.rotulo) + '</b>, ' + brl0(perto.a_vista.diferenca_valor_presente) + ' acima em dinheiro de hoje.';
-      }
-      conta = '<div class="asstConta"><b>À vista ou financiar e deixar o dinheiro aplicado?</b>' +
-        '<span>CDI de ' + pct(Number(st.ref.cdi_aa) / 100) + ' a.a. das Referências de Mercado de ' + esc(dataRef) + (st.ref.desatualizada ? ' (referência com mais de 50 dias)' : '') +
-        ', líquido do IR da faixa do prazo de cada proposta. Custo de cada uma em dinheiro de hoje:</span>' +
-        '<span class="asstMono">' + lista + '</span>' +
-        '<span>Pagando à vista: <b>' + brl0(pagina.valor()) + '</b>. ' + frase + '</span></div>';
+    dito.push(st.vend.rebate !== 'sim' ? 'sem rebate' : (st.vend.tradein === 'sim' ? 'rebate com bônus de trade-in' : 'rebate possível'));
+    var corpo;
+    if (res.nenhuma_cabe) {
+      corpo = '<div class="asstNota warn">Nenhuma combinação cabe em ' + brl0(r.parcela_max) + ' por mês com esta entrada. Esta é a que chega mais perto:</div>' +
+        '<div class="asstCards asstCardsUm">' + cartaoHtml(res.propostas[0], 0, 'p') + '</div>' +
+        (res.para_caber.length ? '<div class="asstCaber"><b>Para caber em ' + brl0(r.parcela_max) + ':</b><div class="asstCards">' +
+          res.para_caber.map(function (s, i) { var p = Object.assign({}, s.proposta, { rotulo: s.texto }); return cartaoHtml(p, i, 's'); }).join('') + '</div></div>'
+          : '<p class="asstSub">Nem com mais entrada nem com balão no fim os planos do simulador chegam a essa parcela.</p>');
+    } else {
+      corpo = '<div class="asstCards">' + res.propostas.map(function (p, i) { return cartaoHtml(p, i, 'p'); }).join('') + '</div>';
     }
-    var d = res.diferencas.leve_para_menos_juros, explica = '';
-    if (res.propostas.length >= 2 && d.parcela > 0) explica = '<p class="asstExplica">Da opção de parcela mais leve para a de menos juros, a parcela sobe ' + brl(d.parcela) + ' por mês e o total pago cai ' + brl(d.total_pago) + '.</p>';
-    var nada = res.nenhuma_cabe ? '<div class="asstNota warn">Nenhum plano fica dentro da parcela confortável com esta entrada. As opções abaixo passam do valor que o cliente disse.</div>' : '';
+    var renda = res.alerta_renda ? '<div class="asstNota warn">Com a renda informada, alguma parcela passa de ' + Math.round(cfg.limite_renda * 100) + '% da renda. Vale conferir com o cliente se cabe com folga.</div>' : '';
+    var avista = res.perfil === 'A_VISTA' ? '<button type="button" class="btn btn-secondary" data-escolher="avista">Cliente vai pagar à vista</button>' : '';
     return '<div class="asstPerfil"><span class="asstPill">Perfil: ' + esc(PERFIL_NOME[res.perfil]) + '</span><span class="asstDito">' + esc(dito.join(' · ')) + '</span><button type="button" class="btn-tertiary" data-a="editar">Mudar respostas</button></div>' +
-      topo + nada + '<div class="asstCards">' + res.propostas.map(cartaoHtml).join('') + '</div>' + explica + conta +
-      '<div class="asstFino"><span>Estes números são do Simulador de Novos com as tabelas de hoje. CET estimado; o oficial vem no contrato do banco.</span>' +
-      '<span>A sugestão é do assistente; um gestor de F&amp;I revisa antes de qualquer contrato. ' + res.opcoes_avaliadas + ' opções do simulador avaliadas; rebate, retorno e comissão não entram na escolha.</span></div>' +
-      '<div class="asstNav"><button type="button" class="btn btn-secondary" data-escolher="nenhuma">Nenhuma serviu</button></div>';
+      renda + corpo +
+      '<div class="asstFino"><span><b>Simulação aproximada com taxas base; os valores finais dependem da aprovação do banco.</b></span>' +
+      '<span>A sugestão é do assistente; um gestor de F&amp;I revisa antes de qualquer contrato. Rebate, retorno e comissão não entram na escolha.</span></div>' +
+      '<div class="asstNav">' + avista + '<button type="button" class="btn btn-secondary" data-escolher="nenhuma">Nenhuma serviu</button></div>';
   }
 
   function finalHtml() {
     var p = st.escolha;
     var linha = p === 'avista' ? 'Cliente vai pagar à vista: <b>' + brl0(pagina.valor()) + '</b>.' : (p === 'nenhuma' ? 'Nenhuma proposta serviu.' :
-      'Proposta: <b>' + esc(p.plano_nome) + ' ' + p.prazo + 'x de ' + brl(p.parcela) + '</b>.');
+      'Proposta: <b>' + esc(p.plano_nome) + ' ' + p.prazo + 'x de ' + brl(p.parcela) + '</b>, entrada de ' + brl0(p.entrada) +
+      (p.baloes.length ? ' e balão de ' + brl0(p.baloes[0].valor) + ' na ' + p.baloes[0].mes + 'ª parcela' : '') + '.');
     var res = st.resultado ? '<p class="asstOk">Registrado: ' + (st.resultado === 'fechou' ? 'cliente fechou' : 'cliente não fechou') + '. Nenhum dado pessoal do cliente é gravado.</p>' : '';
     return '<span class="asstHint">Resumo</span><p class="asstQ">' + linha + '</p>' +
-      '<p class="asstSub">Use o simulador para conferir e seguir com a proposta. Quando souber, marque o resultado:</p>' +
+      '<p class="asstSub">Use o simulador para conferir e seguir com a proposta. Simulação aproximada com taxas base; os valores finais dependem da aprovação do banco. Quando souber, marque o resultado:</p>' +
       '<div class="asstEscolhaDupla"><button type="button" class="btn ' + (st.resultado === 'fechou' ? 'btn-primary' : 'btn-secondary') + '" data-resultado="fechou">Cliente fechou</button>' +
       '<button type="button" class="btn ' + (st.resultado === 'nao_fechou' ? 'btn-primary' : 'btn-secondary') + '" data-resultado="nao_fechou">Cliente não fechou</button></div>' + res +
       '<div class="asstNav"><button type="button" class="btn btn-secondary" data-a="voltarResultado">Voltar às propostas</button><button type="button" class="btn btn-primary" data-a="fechar" data-foco>Fechar</button></div>';
@@ -350,35 +330,38 @@
       b.onclick = function () {
         lerCampos();
         var x = b.getAttribute('data-ch').split(':');
-        if (x[0] === 'campanhas') st.campanhas = x[1] === 'sim'; else st.resp[x[0]] = x[1];
+        if (x[0] === 'rebate' || x[0] === 'tradein') { st.vend[x[0]] = x[1]; if (x[0] === 'rebate' && x[1] === 'nao') st.vend.tradein = null; }
+        else st.resp[x[0]] = x[1];
         desenhar();
       };
     });
     body.querySelectorAll('[data-a]').forEach(function (b) {
       b.onclick = function () {
         lerCampos();
-        var a = b.getAttribute('data-a'), qs = perguntasVisiveis();
+        var a = b.getAttribute('data-a');
         if (a === 'fechar') return fechar();
-        if (a === 'comecar') { st.passo = 'pergunta'; st.idx = 0; }
-        else if (a === 'voltar') { if (st.idx === 0) st.passo = 'antes'; else st.idx--; }
-        else if (a === 'proxima') { if (st.idx < qs.length - 1) st.idx++; else { calcular(); st.passo = 'resultado'; } }
-        else if (a === 'editar') { st.passo = 'pergunta'; st.idx = 0; }
+        if (a === 'voltar') {
+          if (st.passo === 'pergunta') { if (st.idx === 0) return fechar(); st.idx--; }
+          else if (st.passo === 'vendedor') { if (st.idx === 0) { st.passo = 'pergunta'; st.idx = PERGUNTAS.length - 1; } else st.idx--; }
+        } else if (a === 'proxima') {
+          if (st.passo === 'pergunta') { if (st.idx < PERGUNTAS.length - 1) st.idx++; else { st.passo = 'vendedor'; st.idx = 0; } }
+          else { var vq = vendVisiveis(); if (st.idx < vq.length - 1) st.idx++; else { calcular(); st.passo = 'resultado'; } }
+        } else if (a === 'editar') { st.passo = 'pergunta'; st.idx = 0; }
         else if (a === 'voltarResultado') { st.passo = 'resultado'; }
-        else if (a === 'final') { st.passo = 'final'; }
         desenhar();
       };
     });
     body.querySelectorAll('[data-escolher]').forEach(function (b) {
       b.onclick = function () {
         var v = b.getAttribute('data-escolher');
-        if (v === 'avista') { st.escolha = 'avista'; registrar('escolhido', { proposta_coluna: 'a_vista', proposta_plano: 'A_VISTA', proposta_prazo: 0, valor_financiado: 0 }); st.passo = 'final'; }
-        else if (v === 'nenhuma') { st.escolha = 'nenhuma'; registrar('escolhido', { proposta_coluna: 'nenhuma' }); st.passo = 'final'; }
+        if (v === 'avista') { st.escolha = 'avista'; registrar('escolhido', { proposta_coluna: 'a_vista', proposta_plano: 'A_VISTA', proposta_prazo: 0, valor_financiado: 0 }); }
+        else if (v === 'nenhuma') { st.escolha = 'nenhuma'; registrar('escolhido', { proposta_coluna: 'nenhuma' }); }
         else {
-          var p = st.res.propostas[Number(v)];
+          var p = v.charAt(0) === 's' ? st.res.para_caber[Number(v.slice(1))].proposta : st.res.propostas[Number(v.slice(1))];
           st.escolha = p;
           registrar('escolhido', { proposta_coluna: p.coluna, proposta_plano: p.plano, proposta_prazo: p.prazo, valor_financiado: Math.round(p.financiado / 1000) * 1000 });
-          st.passo = 'final';
         }
+        st.passo = 'final';
         desenhar();
       };
     });
@@ -395,7 +378,7 @@
   window.NX_ASSISTENTE = {
     anexar: anexar, novaVisita: novaVisita,
     // Diagnóstico (testes): eventos do log local, último resultado da regra e as tabelas que a tela entregou. Nada é enviado.
-    _diagnostico: function () { return { log: log.slice(), cfg: cfg, sessao: sessao ? { id: sessao.id } : null, popupMostrado: popupMostrado, mudancas: mudancas, resultado: st && st.res, entrada: st ? { modelo: st.campanhas ? st.modelo : '', campanhas: !!st.campanhas } : null }; },
+    _diagnostico: function () { return { log: log.slice(), cfg: cfg, sessao: sessao ? { id: sessao.id } : null, popupMostrado: popupMostrado, mudancas: mudancas, resultado: st && st.res, entrada: st ? { modelo: st.modelo, vendedor: st.vend } : null }; },
     _tabelas: function () { return pagina ? pagina.tabelas() : Promise.reject('sem pagina'); }
   };
 })();
