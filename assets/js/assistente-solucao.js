@@ -158,6 +158,8 @@
   ];
   function abrir(origem) {
     if (!preenchido()) return;
+    var pop = document.getElementById('asstPop'); if (pop) pop.remove();   // o pop-up some quando o assistente abre
+    popupMostrado = true;
     garantirSessao(true);
     if (!sessao.oferecido) oferecer(origem);
     registrar('aberto', { origem: origem });
