@@ -1,7 +1,7 @@
 /* GERADO — não editar. Assistente de solução financeira: regra das 3 propostas (Simulador de Novos).
-   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 1f45060).
+   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 767b1f1).
    Gerador: docs/assistente/gerar_regra_navegador.ts. sha256 das fontes (16 primeiros):
-   engine/assistente.ts 47178923ac6d8428
+   engine/assistente.ts 9b7b95d14cdcee6b
    engine/novos.ts 341f5dc0aa5382ef
    engine/ofertas.ts 2005d0d02d5ddf4d
    engine/comum.ts 5199112a8c402a3c
@@ -565,9 +565,9 @@
     }
     const meioEquilibrio = !!meio && rotuloMeio === "Equil\xEDbrio";
     const destaque = {
-      PARCELA: meioEquilibrio ? "meio" : "menos_juros",
+      PARCELA: "leve",
       CUSTO_TOTAL: "menos_juros",
-      LIQUIDEZ: meioEquilibrio ? "meio" : "menos_juros",
+      LIQUIDEZ: meioEquilibrio ? "meio" : "leve",
       A_VISTA: null
     };
     const lim = max === null ? "" : ` em ${brl0(max)}`;
@@ -681,6 +681,6 @@
     };
   }
 
-  // ../../Users/luis9/AppData/Local/Temp/66a404e3e4982b2d/entrada.ts
+  // ../../Users/luis9/AppData/Local/Temp/96d80072283c862b/entrada.ts
   globalThis.NX_ASSISTENTE_REGRA = assistente_exports;
 })();
