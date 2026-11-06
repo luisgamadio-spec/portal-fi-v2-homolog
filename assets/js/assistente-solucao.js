@@ -1,12 +1,13 @@
 /* Assistente de solução financeira — Simulador de Novos (Fase 2, 30/10/2026; plano e decisões do Luis de 29–30/10).
    - Botão "Encontrar a melhor solução" sempre visível nos planos com valor do bem e entrada; pop-up de reforço depois de N mudanças
      (assist_config.popup_mudancas), no máximo 1 vez por visita ao simulador.
-   - 4 perguntas ao cliente e, no fim, 1 ou 2 só para o vendedor (rebate? bônus de trade-in?) — 31/10/2026.
+   - 4 perguntas ao cliente e, no fim, 1 só para o vendedor (rebate?) — 31/10/2026; a do bônus de trade-in saiu em 06/11/2026.
+   - (06/11/2026) O Plano Coparticipado NÃO EXISTE MAIS: não é proposto e a pergunta do modelo saiu. A Taxa Subsidiada continua igual.
    - Só propostas dentro da parcela confortável; se nada couber, a mais perto e o que falta (entrada/prazo/balão).
    - Cada proposta mostra só plano, entrada, parcela, prazo, balão e uma frase (simulação aproximada com taxas base).
    - TODOS os números vêm de window.NX_ASSISTENTE_REGRA (gerado de engine/assistente.ts, a mesma regra testada na função) com as
      tabelas vigentes do próprio simulador. Este arquivo não faz conta de financiamento: só formata o que a regra devolve.
-   - (31/10) Seguro prestamista: no Balão e no Coparticipado vem dentro da parcela, exatamente como no Simulador (e no CET);
+   - (31/10) Seguro prestamista: no Balão vem dentro da parcela, exatamente como no Simulador (e no CET);
      no Linear, igual ao Simulador, sem seguro. Não há passo de opcionais.
    - Registro de uso (assist_registrar_evento): só códigos de resposta e a proposta escolhida, nunca nome, CPF, renda ou valores
      digitados. Mesma trava da telemetria dos simuladores: grava de verdade só em AUTHORIZED_PRODUCTION; fora dela, fica no log local. */
@@ -150,11 +151,10 @@
   function novaVisita(p) { pagina = p; popupMostrado = false; mudancas = 0; sessao = null; fechar(); }
 
   // ---------- fluxo ----------
-  // 31/10/2026 (teste do Luis no homolog): 4 perguntas ao cliente e, no fim, 1 ou 2 só para o vendedor (rebate? bônus de trade-in?).
+  // 31/10/2026 (teste do Luis no homolog): 4 perguntas ao cliente e, no fim, 1 só para o vendedor (rebate?). 06/11: sem trade-in.
   // Cada proposta mostra só plano, entrada, parcela, prazo, balão e a frase da regra. O simulador é aproximado (taxas base).
   var VENDEDOR = [
-    { id: 'rebate', q: 'É possível usar rebate neste caso?', opts: [['nao', 'Não'], ['sim', 'Sim']] },
-    { id: 'tradein', q: 'Está sendo usado bônus de trade-in?', opts: [['nao', 'Não'], ['sim', 'Sim']], so: function (v) { return v.rebate === 'sim'; } }
+    { id: 'rebate', q: 'É possível usar rebate neste caso?', opts: [['nao', 'Não'], ['sim', 'Sim']] }
   ];
   function abrir(origem) {
     if (!preenchido()) return;
@@ -165,9 +165,9 @@
     registrar('aberto', { origem: origem });
     sessao.aberto = true;
     st = { passo: 'pergunta', idx: 0, origem: origem, resp: { prioridade: null, faixa: null, outroValor: '', renda: '', troca: null, dinheiro: null, dinheiroValor: '' },
-      vend: { rebate: null, tradein: null }, modelo: '', tab: null, copart: false, carregando: true, erro: null, res: null, escolha: null, resultado: null };
+      vend: { rebate: null }, tab: null, carregando: true, erro: null, res: null, escolha: null, resultado: null };
     montarJanela();
-    pagina.tabelas().then(function (t) { if (!st) return; st.tab = t.tabelas; st.copart = t.copart; st.carregando = false; desenhar(); },
+    pagina.tabelas().then(function (t) { if (!st) return; st.tab = t.tabelas; st.carregando = false; desenhar(); },
       function () { if (!st) return; st.carregando = false; st.erro = 'Não foi possível carregar as condições vigentes do simulador. Tente novamente.'; desenhar(); });
   }
   function montarJanela() {
@@ -236,14 +236,8 @@
   }
   function vendedorHtml() {
     var qs = vendVisiveis(), q = qs[st.idx], v = st.vend, extra = '';
-    if (q.id === 'tradein' && v.tradein === 'nao') {
-      var modelos = (st.tab && st.tab.copartModels || []).map(function (m) { return m.name; });
-      extra = '<div class="field"><label for="asstModelo">Modelo (para o Plano Coparticipado)</label><select id="asstModelo" class="asstSelect">' +
-        '<option value="">Outro modelo / não sei</option>' + modelos.map(function (n) { return '<option' + (st.modelo === n ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') +
-        '</select>' + (st.copart ? '' : '<span class="hint">O Coparticipado não carregou agora; só a Taxa Subsidiada entra.</span>') + '</div>';
-    }
-    var regra = q.id === 'rebate' ? 'Sem rebate, a Taxa Subsidiada e o Coparticipado não entram.' : 'Com bônus de trade-in, o Coparticipado não pode ser oferecido; a Taxa Subsidiada pode.';
-    var ultima = st.idx === qs.length - 1 && (q.id === 'tradein' || v.rebate === 'nao');
+    var regra = 'Sem rebate, a Taxa Subsidiada não entra.';
+    var ultima = st.idx === qs.length - 1;
     return resumoTopo() + '<span class="asstHint">Só para você</span>' +
       '<p class="asstQ">' + esc(q.q) + '</p>' + chipsHtml(q.id, q.opts, v[q.id]) + '<p class="asstSub">' + esc(regra) + '</p>' + extra +
       '<div class="asstNav"><button type="button" class="btn btn-secondary" data-a="voltar">Voltar</button><button type="button" class="btn btn-primary" data-a="proxima"' + (v[q.id] ? '' : ' disabled') + ' data-foco>' + (ultima ? 'Ver as propostas' : 'Próxima') + '</button></div>';
@@ -256,16 +250,16 @@
       dinheiro: r.dinheiro, dinheiro_extra: r.dinheiro === 'sim' ? parseBRL(r.dinheiroValor) : 0 };
   }
   function calcular() {
-    var rebate = st.vend.rebate === 'sim', trade = rebate && st.vend.tradein === 'sim';
-    var camp = REGRA.campanhasPermitidas(rebate, trade);
+    var rebate = st.vend.rebate === 'sim';
+    var camp = REGRA.campanhasPermitidas(rebate);
     var res = REGRA.montarTresPropostas(
-      { modelo: camp.coparticipado ? st.modelo : '', versao: null, valor: pagina.valor(), entrada: pagina.entrada(), tabelas: st.tab },
+      { modelo: '', versao: null, valor: pagina.valor(), entrada: pagina.entrada(), tabelas: st.tab },
       respostasRegra(), { balao_pct: cfg.balao_pct, limite_renda: cfg.limite_renda, campanhas: camp });
     st.res = res;
     if (res && !res.erro) {
       registrar('concluido', {
         perfil_cliente: res.perfil, faixa_parcela: st.resp.faixa, troca: st.resp.troca, dinheiro: st.resp.dinheiro,
-        campanhas_liberadas: st.vend.rebate ? rebate : null, bonus_trade_in: rebate ? trade : null, modelo: camp.coparticipado && st.modelo ? st.modelo : null,
+        campanhas_liberadas: st.vend.rebate ? rebate : null, bonus_trade_in: null, modelo: null,
         alerta_renda: res.alerta_renda, propostas_qtd: Math.min(3, res.propostas.length)
       });
     }
@@ -292,7 +286,7 @@
     dito.push(r.troca === 'sim' ? 'troca em 2–3 anos' : (r.troca === 'nao' ? 'fica bastante tempo com o carro' : 'ainda não sabe quando troca'));
     if (r.dinheiro === 'sim' && r.dinheiro_extra > 0) dito.push('tem cerca de ' + brl0(r.dinheiro_extra) + ' além da entrada');
     if (r.dinheiro === 'nao_mexer') dito.push('não quer mexer na reserva');
-    dito.push(!st.vend.rebate ? 'campanhas não se aplicam (entrada abaixo de 50%)' : (st.vend.rebate !== 'sim' ? 'sem rebate' : (st.vend.tradein === 'sim' ? 'rebate com bônus de trade-in' : 'rebate possível')));
+    dito.push(!st.vend.rebate ? 'campanhas não se aplicam (entrada abaixo de 50%)' : (st.vend.rebate !== 'sim' ? 'sem rebate' : 'rebate possível'));
     var corpo;
     if (res.nenhuma_cabe) {
       corpo = '<div class="asstNota warn">Nenhuma combinação cabe em ' + brl0(r.parcela_max) + ' por mês com esta entrada. Esta é a que chega mais perto:</div>' +
@@ -329,14 +323,13 @@
     var o = document.getElementById('asstOutro'); if (o) st.resp.outroValor = o.value;
     var r = document.getElementById('asstRenda'); if (r) st.resp.renda = r.value;
     var d = document.getElementById('asstDinheiro'); if (d) st.resp.dinheiroValor = d.value;
-    var m = document.getElementById('asstModelo'); if (m) st.modelo = m.value;
   }
   function ligar(body) {
     body.querySelectorAll('[data-ch]').forEach(function (b) {
       b.onclick = function () {
         lerCampos();
         var x = b.getAttribute('data-ch').split(':');
-        if (x[0] === 'rebate' || x[0] === 'tradein') { st.vend[x[0]] = x[1]; if (x[0] === 'rebate' && x[1] === 'nao') st.vend.tradein = null; }
+        if (x[0] === 'rebate') { st.vend.rebate = x[1]; }
         else st.resp[x[0]] = x[1];
         desenhar();
       };
@@ -353,9 +346,9 @@
         } else if (a === 'proxima') {
           if (st.passo === 'pergunta') {
             if (st.idx < PERGUNTAS.length - 1) st.idx++;
-            // 31/10: rebate/trade-in só se o cliente chega a 50% de entrada (com ou sem o dinheiro extra); senão, direto às propostas
+            // 31/10: rebate só se o cliente chega a 50% de entrada (com ou sem o dinheiro extra); senão, direto às propostas
             else if (podePerguntarRebate()) { st.passo = 'vendedor'; st.idx = 0; }
-            else { st.vend = { rebate: null, tradein: null }; calcular(); st.passo = 'resultado'; }
+            else { st.vend = { rebate: null }; calcular(); st.passo = 'resultado'; }
           }
           else { var vq = vendVisiveis(); if (st.idx < vq.length - 1) st.idx++; else { calcular(); st.passo = 'resultado'; } }
         } else if (a === 'editar') { st.passo = 'pergunta'; st.idx = 0; }

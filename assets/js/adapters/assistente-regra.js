@@ -1,9 +1,9 @@
 /* GERADO — não editar. Assistente de solução financeira: regra das 3 propostas (Simulador de Novos).
-   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit e1cdb5d).
+   Fonte: branch feature/brabus-intelligence-v1, supabase/functions/brabus-intelligence/engine/assistente.ts (commit 51727db).
    Gerador: docs/assistente/gerar_regra_navegador.ts. sha256 das fontes (16 primeiros):
-   engine/assistente.ts c6a232b94f7e6cae
+   engine/assistente.ts e3f093f1da33dd3b
    engine/novos.ts 341f5dc0aa5382ef
-   engine/ofertas.ts 2005d0d02d5ddf4d
+   engine/ofertas.ts 7729e5f65d23adf7
    engine/comum.ts 5199112a8c402a3c
    engine/seminovos.ts 2bfcfcb2801df366
    Expõe window.NX_ASSISTENTE_REGRA (montarTresPropostas, CONFIG_PADRAO, AVISO_IOF_LINEAR, ...). */
@@ -58,14 +58,6 @@
     30,
     36,
     42,
-    48,
-    60
-  ];
-  var PRAZOS_COPART = [
-    12,
-    18,
-    24,
-    36,
     48,
     60
   ];
@@ -242,47 +234,6 @@
       linhas
     };
   }
-  function coefFor(prazo, taxa, txCoef) {
-    const obj = txCoef[String(prazo)];
-    if (!obj) return null;
-    const k = Object.keys(obj).find((x) => Math.abs(Number(x) - taxa) < 1e-7);
-    return k !== void 0 ? obj[k] : null;
-  }
-  function coparticipado(modelo, venda, entrada, t) {
-    const m = t.copartModels.find((x) => x.name === modelo);
-    if (!m) return {
-      erro: `Modelo fora do Plano Coparticipado. Modelos v\xE1lidos: ${t.copartModels.map((x) => x.name).join(", ")}.`
-    };
-    if (!(venda > 0)) return {
-      erro: "Informe o valor de venda."
-    };
-    if (!(entrada >= venda * m.entry)) return {
-      erro: `A entrada m\xEDnima permitida para este plano \xE9 de ${pct(m.entry)}.`
-    };
-    const fin = Math.max(venda - entrada, 0);
-    const termos = PRAZOS_COPART.map((p) => {
-      const taxa = m.rates[String(p)];
-      const coef = coefFor(p, taxa, t.copartTxCoef);
-      const acrescimo = p <= 24 ? 0.0411 : 0.0622;
-      return {
-        prazo: p,
-        taxa,
-        parcela: coef ? fin * (1 + acrescimo) * coef : null
-      };
-    });
-    const total = fin * m.rebate;
-    const brabus = total * m.brabus;
-    return {
-      modelo: m.name,
-      entradaMinima: m.entry,
-      financiado: fin,
-      termos,
-      rebateTotal: total,
-      rebateBrabus: brabus,
-      rebateHpe: total * m.hpe,
-      valorFinalVenda: Math.max(venda - brabus, 0)
-    };
-  }
 
   // supabase/functions/brabus-intelligence/engine/ofertas.ts
   var BALAO_PREFERIDAS = [
@@ -319,13 +270,6 @@
       aceitacao: 4
     }
   ];
-  function normalizaModelo(s) {
-    return String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
-  }
-  function casaModelo(modelo, versao, nomes) {
-    const alvo = normalizaModelo(`${modelo} ${versao ?? ""}`);
-    return nomes.find((n) => normalizaModelo(n) === alvo) ?? null;
-  }
 
   // supabase/functions/brabus-intelligence/engine/assistente.ts
   var ENTRADA_MIN_CAMPANHAS = 0.5;
@@ -334,22 +278,16 @@
     const extra = r.dinheiro === "sim" && r.dinheiro_extra > 0 ? r.dinheiro_extra : 0;
     return entrada / valor >= ENTRADA_MIN_CAMPANHAS - 1e-12 || extra > 0 && (entrada + extra) / valor >= ENTRADA_MIN_CAMPANHAS - 1e-12;
   }
-  function campanhasPermitidas(rebate, bonusTradeIn) {
-    if (!rebate) return {
-      taxa_subsidiada: false,
-      coparticipado: false
-    };
+  function campanhasPermitidas(rebate) {
     return {
-      taxa_subsidiada: true,
-      coparticipado: !bonusTradeIn
+      taxa_subsidiada: rebate
     };
   }
   var CONFIG_PADRAO = {
     balao_pct: 0.3,
     limite_renda: 0.3,
     campanhas: {
-      taxa_subsidiada: false,
-      coparticipado: false
+      taxa_subsidiada: false
     }
   };
   function perfilDasRespostas(r) {
@@ -437,25 +375,6 @@
         }));
       }
     }
-    if (cfg.campanhas.coparticipado) {
-      const nome = casaModelo(e.modelo, e.versao, e.tabelas.copartModels.map((m) => m.name));
-      if (nome) {
-        const cp = coparticipado(nome, e.valor, entrada, e.tabelas);
-        if (!ehErro(cp)) {
-          for (const x of cp.termos) if (x.parcela) {
-            out.push(cand({
-              plano: "COPARTICIPADO",
-              plano_nome: "Plano Coparticipado",
-              prazo: x.prazo,
-              entrada,
-              financiado: cp.financiado,
-              parcela: x.parcela,
-              baloes: []
-            }));
-          }
-        }
-      }
-    }
     return out;
   }
   function entradasAvaliadas(e, r, perfil, cfg) {
@@ -465,10 +384,6 @@
     if (perfil === "LIQUIDEZ" || r.dinheiro !== "sim" || !(r.dinheiro_extra > 0)) return out;
     const minimos = [];
     if (cfg.campanhas.taxa_subsidiada) minimos.push(0.5);
-    if (cfg.campanhas.coparticipado) {
-      const cp = casaModelo(e.modelo, e.versao, e.tabelas.copartModels.map((m) => m.name));
-      if (cp) minimos.push(e.tabelas.copartModels.find((m) => m.name === cp).entry);
-    }
     for (const p of minimos) {
       const ent = Math.ceil(e.valor * p);
       if (ent > e.entrada && ent <= e.entrada + r.dinheiro_extra && ent < e.valor) out.push(ent);
@@ -490,9 +405,11 @@
         ...config.campanhas ?? {}
       }
     };
+    cfg.campanhas = {
+      taxa_subsidiada: !!cfg.campanhas.taxa_subsidiada
+    };
     if (!alcancaEntradaCampanhas(e.valor, e.entrada, r)) cfg.campanhas = {
-      taxa_subsidiada: false,
-      coparticipado: false
+      taxa_subsidiada: false
     };
     if (!(e.valor > 0)) return {
       erro: "Informe o valor do ve\xEDculo."
@@ -509,13 +426,13 @@
     const perfil = perfilDasRespostas(r);
     const max = r.parcela_max;
     const cabe = (c) => max === null || c.parcela <= max + 1e-9;
-    const comBalao = r.troca === "sim";
-    const base = opcoesMensais(e, e.entrada, comBalao, cfg);
+    const trocaCurta = r.troca === "sim";
+    const base = opcoesMensais(e, e.entrada, true, cfg);
     if (!base.length) return {
       erro: "Nenhum plano do Simulador de Novos calcula para este valor e esta entrada."
     };
     const todas = entradasAvaliadas(e, r, perfil, cfg).flatMap((ent) => ent === e.entrada ? base : opcoesMensais(e, ent, false, cfg));
-    const baseCabe = base.filter(cabe), todasCabem = todas.filter(cabe);
+    const todasCabem = todas.filter(cabe);
     const ctx = {
       e,
       r,
@@ -524,76 +441,93 @@
       perfil
     };
     if (!todasCabem.length) {
+      const naoBalao = todas.filter((c) => trocaCurta || c.plano !== "BALAO");
       const perto = [
-        ...todas
+        ...naoBalao.length ? naoBalao : todas
       ].sort(porParcela)[0];
       const falta = perto.parcela - max;
       return resultado(ctx, [
         prop(ctx, perto, "mais_perto", "Mais perto do que o cliente pediu", false, `Faltam ${brl0(Math.ceil(falta))} por m\xEAs para caber em ${brl0(max)}.`)
-      ], todas.length, true, falta, paraCaber(ctx, comBalao));
+      ], todas.length, true, falta, paraCaber(ctx, trocaCurta));
     }
-    const usadas = /* @__PURE__ */ new Set();
-    const pega = (lista) => {
-      const c = lista.find((x) => !usadas.has(chave(x))) ?? null;
-      if (c) usadas.add(chave(c));
-      return c;
-    };
-    const menosJuros = pega([
-      ...todasCabem
-    ].sort(porPrazo));
-    const levePool = baseCabe.length ? baseCabe : todasCabem;
-    const maisLeve = [
-      ...levePool
-    ].sort(porParcela)[0];
-    if (chave(maisLeve) === chave(menosJuros) || menosJuros.parcela <= maisLeve.parcela + 1e-9) {
-      return dominante(ctx, todasCabem, levePool, menosJuros, todas.length);
-    }
-    const leve = pega([
-      ...levePool
-    ].sort(porParcela));
-    let meio = null, rotuloMeio = "Equil\xEDbrio";
-    if (leve) {
-      const livres = levePool.filter((c) => !usadas.has(chave(c)));
-      const fronteira = livres.filter((c) => !levePool.some((o) => o !== c && o.parcela <= c.parcela && o.prazo <= c.prazo && (o.parcela < c.parcela || o.prazo < c.prazo))).filter((c) => c.parcela > leve.parcela && c.parcela < menosJuros.parcela && c.prazo < leve.prazo && c.prazo > menosJuros.prazo).sort(porParcela);
-      if (fronteira.length) meio = pega([
-        fronteira[Math.floor((fronteira.length - 1) / 2)]
-      ]);
-      if (!meio && leve.plano === "BALAO" && menosJuros.plano === "BALAO") {
-        meio = pega(livres.filter((c) => c.plano !== "BALAO").sort(porPrazo));
-        if (meio) rotuloMeio = "Sem bal\xE3o";
+    const lim = max === null ? "" : ` em ${brl0(max)}`;
+    const diferente = (a, b) => a.plano !== b.plano || a.prazo !== b.prazo;
+    const criterio = r.prioridade === "juros" ? porPrazo : porParcela;
+    const props = [];
+    const pool1 = todasCabem.filter((c) => trocaCurta || c.plano !== "BALAO");
+    const p1 = pool1.length ? pool1 : todasCabem;
+    let c1, col1, rot1, mot1;
+    if (r.prioridade === "juros") {
+      c1 = [
+        ...p1
+      ].sort(porPrazo)[0];
+      col1 = "menos_juros";
+      rot1 = "Quita mais r\xE1pido";
+      mot1 = `Cabe${lim} e \xE9 o menor prazo que cabe no bolso.`;
+    } else {
+      c1 = [
+        ...p1
+      ].sort(porParcela)[0];
+      col1 = "leve";
+      rot1 = "Parcela mais leve";
+      mot1 = `\xC9 a menor parcela entre as op\xE7\xF5es que cabem${lim}.`;
+      if (r.prioridade === "aplicado") {
+        const fr = p1.filter((c) => !p1.some((o) => o !== c && o.parcela <= c.parcela && o.prazo <= c.prazo && (o.parcela < c.parcela || o.prazo < c.prazo))).sort(porParcela);
+        if (fr.length >= 3) {
+          c1 = fr[Math.floor((fr.length - 1) / 2)];
+          col1 = "meio";
+          rot1 = "Equil\xEDbrio";
+          mot1 = `Meio-termo entre a parcela mais leve e o menor prazo que cabem${lim}.`;
+        }
       }
     }
-    const meioEquilibrio = !!meio && rotuloMeio === "Equil\xEDbrio";
-    const destaque = {
-      PARCELA: "leve",
-      CUSTO_TOTAL: "menos_juros",
-      LIQUIDEZ: meioEquilibrio ? "meio" : "leve",
-      A_VISTA: null
-    };
-    const lim = max === null ? "" : ` em ${brl0(max)}`;
-    const props = [];
-    if (leve) props.push(prop(ctx, leve, "leve", "Parcela mais leve", destaque[perfil] === "leve", `\xC9 a menor parcela entre as op\xE7\xF5es que cabem${lim}.`));
-    if (meio) props.push(prop(ctx, meio, "meio", rotuloMeio, destaque[perfil] === "meio", rotuloMeio === "Sem bal\xE3o" ? `Sem bal\xE3o no fim, com parcela que cabe${lim}.` : `Meio-termo: parcela menor que a de quem quita mais r\xE1pido e prazo menor que o da mais leve.`));
-    props.push(prop(ctx, menosJuros, "menos_juros", "Quita mais r\xE1pido", destaque[perfil] === "menos_juros", `Cabe${lim} e \xE9 o menor prazo que cabe no bolso.`));
+    props.push(prop(ctx, c1, col1, rot1, r.prioridade !== "avista", mot1 + (c1.plano === "BALAO" && !trocaCurta ? motivoBalao(c1) : "")));
+    const okBalao = (c) => c.plano !== "BALAO" || trocaCurta || c.baloes[0]?.mes === c.prazo;
+    const outroPlano = todasCabem.filter((c) => c.plano !== c1.plano && okBalao(c)).sort(criterio)[0];
+    const c2 = outroPlano ?? todasCabem.filter((c) => diferente(c, c1) && okBalao(c)).sort(criterio)[0];
+    if (c2) {
+      const mot2 = c2.plano === "BALAO" ? `Plano Bal\xE3o em ${c2.prazo}x, que tamb\xE9m cabe${lim}.${motivoBalao(c2)}` : `${c2.plano_nome} em ${c2.prazo}x tamb\xE9m cabe${lim}.`;
+      props.push(prop(ctx, c2, "outro_plano", outroPlano ? "Outro plano que cabe" : "Outro prazo que cabe", false, mot2));
+    }
+    const usados = props.map((p) => p);
+    const livre = (c) => usados.every((u) => u.plano !== c.plano || u.prazo !== c.prazo);
+    const jaCabe = todasCabem.filter((c) => c.plano !== "BALAO" && c.prazo < c1.prazo && livre(c)).sort(porPrazo)[0];
+    if (jaCabe) {
+      const extraJa = jaCabe.entrada - e.entrada;
+      props.push(prop(ctx, jaCabe, "quitar_rapido", "Para quitar mais r\xE1pido", false, `Cabe${lim} e quita em ${jaCabe.prazo} meses.` + (extraJa > 0 ? ` Usa ${brl0(extraJa)} do dinheiro extra que o cliente disse ter.` : "")));
+    } else if (max !== null) {
+      const q = quitarComMaisEntrada(ctx, c1.prazo, livre);
+      if (q) props.push(prop(ctx, q.c, "quitar_rapido", "Para quitar mais r\xE1pido", false, `${q.c.prazo}x cabe em ${brl0(max)} com ${brl0(q.extra)} a mais de entrada.`));
+    }
     return resultado(ctx, props, todas.length, false, null, []);
   }
-  function dominante(ctx, todasCabem, baseCabe, melhor, avaliadas) {
-    const campanha = melhor.plano === "TAXA_SUBSIDIADA" || melhor.plano === "COPARTICIPADO";
-    const outra = (c) => melhor.plano === "BALAO" ? c.plano !== "BALAO" : campanha ? c.plano === "LINEAR" || c.plano === "BALAO" : c.plano !== melhor.plano;
-    const prefixo = melhor.plano === "BALAO" ? "Sem bal\xE3o" : campanha ? "Sem campanha" : "Outro plano";
-    const lim = ctx.max === null ? "" : ` em ${brl0(ctx.max)}`;
-    const props = [
-      prop(ctx, melhor, "melhor", "Mais leve e quita mais r\xE1pido", ctx.perfil !== "A_VISTA", `Cabe${lim} com a menor parcela e tamb\xE9m o menor prazo entre as op\xE7\xF5es.`)
-    ];
-    const altLeve = baseCabe.filter(outra).sort(porParcela)[0];
-    const altJuros = todasCabem.filter(outra).sort(porPrazo)[0];
-    if (altLeve) props.push(prop(ctx, altLeve, "leve", `${prefixo} \xB7 parcela mais leve`, false, `${prefixo}: a menor parcela que cabe${lim}.`));
-    if (altJuros && (!altLeve || chave(altJuros) !== chave(altLeve))) props.push(prop(ctx, altJuros, "menos_juros", `${prefixo} \xB7 quita mais r\xE1pido`, false, `${prefixo}: cabe${lim} e \xE9 o menor prazo que cabe no bolso.`));
-    if (props.length === 1) {
-      const resto = todasCabem.filter((c) => chave(c) !== chave(melhor)).sort(porPrazo)[0];
-      if (resto) props.push(prop(ctx, resto, "menos_juros", "Outra op\xE7\xE3o", false, `Tamb\xE9m cabe${lim}.`));
+  function motivoBalao(c) {
+    const b = c.baloes[0];
+    return b ? ` O bal\xE3o de ${brl0(b.valor)} na ${b.mes}\xAA parcela${b.mes === c.prazo ? " (a \xFAltima)" : ""} pode ser quitado ou refinanciado no fim.` : "";
+  }
+  function quitarComMaisEntrada(ctx, prazoAtual, livre) {
+    const { e, cfg, max } = ctx;
+    const prazos = [
+      ...new Set(opcoesMensais(e, e.entrada, false, cfg).concat(opcoesMensais(e, Math.floor((e.valor - 1) / 100) * 100, false, cfg)).filter((c) => c.plano !== "BALAO").map((c) => c.prazo))
+    ].filter((p) => p < prazoAtual).sort((a, b) => b - a);
+    const maxEnt = Math.floor((e.valor - 1) / 100) * 100;
+    for (const alvo of prazos) {
+      const cabeEm = (ent) => opcoesMensais(e, ent, false, cfg).filter((c2) => c2.prazo === alvo && c2.plano !== "BALAO" && c2.parcela <= max + 1e-9 && livre(c2));
+      if (maxEnt <= e.entrada || !cabeEm(maxEnt).length) continue;
+      let lo = e.entrada, hi = maxEnt;
+      while (hi - lo > 100) {
+        const mid = Math.round((lo + hi) / 200) * 100;
+        if (mid <= lo || mid >= hi) break;
+        if (cabeEm(mid).length) hi = mid;
+        else lo = mid;
+      }
+      const c = cabeEm(hi).sort(porParcela)[0];
+      return {
+        c,
+        extra: hi - e.entrada
+      };
     }
-    return resultado(ctx, props, avaliadas, false, null, []);
+    return null;
   }
   function paraCaber(ctx, comBalao) {
     const { e, cfg, max } = ctx;
@@ -645,7 +579,7 @@
   }
   function prop(ctx, c, coluna, rotulo, destaque, motivo) {
     const extra = Math.max(0, c.entrada - ctx.e.entrada);
-    const m = motivo + (extra > 0 && coluna !== "mais_perto" ? ` Usa ${brl0(extra)} do dinheiro extra para chegar \xE0 entrada m\xEDnima da campanha.` : "");
+    const m = motivo + (extra > 0 && coluna !== "mais_perto" && coluna !== "quitar_rapido" ? ` Usa ${brl0(extra)} do dinheiro extra para chegar \xE0 entrada m\xEDnima da campanha.` : "");
     return {
       coluna,
       rotulo,
@@ -674,13 +608,13 @@
       criterios: [
         "Todas as propostas cabem na parcela confort\xE1vel; se nada couber, a mais perto e o que falta para caber.",
         "Parcela mais leve: menor parcela. Quita mais r\xE1pido: menor prazo que cabe (desempate pelo menor custo). Equil\xEDbrio: entre as duas, sem perder nas duas.",
-        "Parcelas iguais \xE0s do Simulador (seguro prestamista dentro no Bal\xE3o e no Coparticipado).",
+        "Parcelas iguais \xE0s do Simulador (seguro prestamista dentro no Bal\xE3o).",
         "Rebate, valor final de venda, retorno e comiss\xE3o n\xE3o entram na escolha. O Plano Bal\xE3o n\xE3o tem prioridade.",
-        "Campanhas: s\xF3 se o cliente chega a 50% de entrada (com ou sem o dinheiro extra); sem rebate, nenhuma; com b\xF4nus de trade-in, s\xF3 a Taxa Subsidiada."
+        "Campanhas: s\xF3 se o cliente chega a 50% de entrada (com ou sem o dinheiro extra); sem rebate, nenhuma; com rebate, a Taxa Subsidiada."
       ]
     };
   }
 
-  // ../../Users/luis9/AppData/Local/Temp/84216a2df5647c70/entrada.ts
+  // ../../Users/luis9/AppData/Local/Temp/78e0311dbf5dbb59/entrada.ts
   globalThis.NX_ASSISTENTE_REGRA = assistente_exports;
 })();
