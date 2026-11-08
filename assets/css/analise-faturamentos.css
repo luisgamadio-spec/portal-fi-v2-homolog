@@ -1,0 +1,58 @@
+/* PORTAL-NEXT V2 — Análise de Faturamentos (08/11/2026, só Master). Sobre module-system.css.
+   Faixas: Normal verde, Em atenção amarelo, Urgência laranja, Grave vermelho. No celular a lista vira cartões.
+   Tudo prefixado com .fat* para não vazar em outros módulos. */
+.fatPage { --fat-normal: #3ac978; --fat-atencao: #f5c518; --fat-urgencia: #ff8c1a; --fat-grave: #e3262f; }
+.fatPage .fatNORMAL { --fat-cor: var(--fat-normal); }
+.fatPage .fatATENCAO { --fat-cor: var(--fat-atencao); }
+.fatPage .fatURGENCIA { --fat-cor: var(--fat-urgencia); }
+.fatPage .fatGRAVE { --fat-cor: var(--fat-grave); }
+
+.fatCarga { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; margin: 0 0 var(--mod-space-control-gap); font-size: 0.8125rem; color: var(--color-text-secondary); }
+.fatAviso { color: #f0c64a; }
+.fatFiltros .modSegmentedGroup { display: flex; flex-wrap: wrap; }
+.fatLimpar { min-width: 0; }
+
+.fatKpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.fatKpiFaixa { text-align: left; background: transparent; color: inherit; font: inherit; cursor: pointer; border-left: 4px solid var(--fat-cor); }
+.fatKpiFaixa > span { display: block; }
+.fatKpiFaixa .modKpiValue { color: var(--fat-cor); }
+.fatKpiFaixa.ativa { background: color-mix(in srgb, var(--fat-cor) 14%, transparent); border-color: var(--fat-cor); }
+.fatKpiFaixa:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.fatKpiTotal .modKpiValue { font-size: 2rem; }
+
+.fatTopsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--mod-space-card-gap); }
+.fatTop ol { list-style: none; margin: 6px 0 0; padding: 0; }
+.fatTop li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px solid var(--mod-border); font-size: 0.8125rem; }
+.fatTop li b { color: var(--fat-grave); font-family: var(--font-mono); }
+
+.fatListaTopo { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: var(--mod-space-card-gap); }
+.fatMono { font-family: var(--font-mono); letter-spacing: .02em; }
+.fatBadge { display: inline-block; font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+  padding: 3px 8px; border-radius: var(--radius-sm); color: var(--fat-cor); border: 1px solid var(--fat-cor); background: color-mix(in srgb, var(--fat-cor) 12%, transparent); white-space: nowrap; }
+.fatTabela .fatLinha td:first-child { box-shadow: inset 4px 0 0 var(--fat-cor); }
+.fatNota { margin-top: 8px; font-size: 0.75rem; }
+.fatBancos { margin-top: var(--mod-space-card-gap); }
+
+/* celular: cartões no lugar da tabela */
+.fatCartoes { display: none; list-style: none; margin: var(--mod-space-control-gap) 0 0; padding: 0; }
+.fatCartao { border: 1px solid var(--mod-border); border-left: 5px solid var(--fat-cor); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 10px; background: var(--color-surface-1); }
+.fatCartaoTopo { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.fatDias { font-family: var(--font-mono); color: var(--fat-cor); font-size: 1rem; }
+.fatCliente { margin: 8px 0 2px; font-weight: 600; font-size: 0.875rem; overflow-wrap: anywhere; }
+.fatCartao .fatMono { margin: 0; font-size: 0.75rem; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.fatCartao dl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin: 10px 0 0; }
+.fatCartao dt { font-size: 0.625rem; text-transform: uppercase; letter-spacing: .06em; color: var(--mod-muted); }
+.fatCartao dd { margin: 1px 0 0; font-size: 0.8125rem; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .fatTabela { display: none; }
+  .fatCartoes { display: block; }
+  .fatFiltros .modField { min-width: 0; flex: 1 1 140px; }
+  .fatKpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fatKpiTotal { grid-column: 1 / -1; }
+}
+
+/* computador: as 11 colunas cabem sem rolar para o lado (cliente, modelo e vendedor quebram linha) */
+.fatTabela .modTable { width: 100%; font-size: 0.78rem; }
+.fatTabela .modTable th, .fatTabela .modTable td { padding: 7px 8px; }
+.fatTabela .modTable td:nth-child(2), .fatTabela .modTable td:nth-child(3), .fatTabela .modTable td:nth-child(5) { white-space: normal; min-width: 110px; }
+.fatTabela .modTable td:nth-child(1) { font-size: 0.72rem; }

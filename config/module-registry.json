@@ -344,6 +344,27 @@
       "landingTitle": "Avaliações de Seminovos",
       "landingDesc": "Avaliação de carros usados no pátio: placa, versão, FIPE e vendas reais do grupo.",
       "notes": "Fase 1: identificação (placa/chassi com fornecedor SIMULADO até a cotação), referências (FIPE + vendas da Base 01) e regras de margem em versões (só Master). Fase 2: vistoria e fotos. Fase 3: 4 valores e aprovação do gerente."
+    },
+    {
+      "id": "analise-faturamentos",
+      "permissionId": "analiseFaturamentos",
+      "authMode": "MASTER_ONLY",
+      "name": "Análise de Faturamentos",
+      "route": "/analise-faturamentos",
+      "title": "Análise de Faturamentos",
+      "density": "MEDIUM-HIGH (resumo + filtros + lista chassi a chassi exportável; cartões no celular)",
+      "authRequirement": "session + MASTER (menu/rota) + master_faturamentos SECURITY DEFINER confere o Master no banco a cada chamada",
+      "designPattern": "módulo novo (08/11/2026) sobre module-system.css + analise-faturamentos.css",
+      "entryPoint": "assets/js/analise-faturamentos.js (NX_ANALISE_FATURAMENTOS_PAGE) + assets/css/analise-faturamentos.css",
+      "businessSource": "Servidor: migração 20261108170000_analise_faturamentos.sql (master_faturamentos, _fat_marcos, _fat_dias_uteis, _fat_feriados); fonte = Base 03 (SPF) + Base 02 + Base 01, a mesma da Análise F&I do Grupo",
+      "functionalSource": null,
+      "approvedReference": null,
+      "migrationWave": null,
+      "risk": "LOW",
+      "migrationStatus": "TECH_READY_HUMAN_UAT_PENDING",
+      "landingTitle": "Análise de Faturamentos",
+      "landingDesc": "Propostas faturadas e ainda sem pagamento do banco: dias úteis em aberto, faixas e prazo por banco.",
+      "notes": "Só Master. Datas de faturamento/pagamento = 1ª carga do SPF com FATURADA/PAGA (opção A) até o relatório do SPF trazer as colunas (opção B: trocar só _fat_marcos)."
     }
   ]
 }

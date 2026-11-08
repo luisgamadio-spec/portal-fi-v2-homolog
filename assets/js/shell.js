@@ -126,7 +126,8 @@
     'salarios-comissoes': 'NX_SALARIOS_COMISSOES_PAGE',
     'brabus-intelligence': 'NX_BRABUS_INTELLIGENCE_PAGE',
     'shell-admin': 'NX_SHELL_ADMIN_PAGE',
-    avaliacoes: 'NX_AVALIACOES_PAGE'
+    avaliacoes: 'NX_AVALIACOES_PAGE',
+    'analise-faturamentos': 'NX_ANALISE_FATURAMENTOS_PAGE'
   };
 
   var hasRenderedOnce = false;
