@@ -1,58 +1,169 @@
-/* PORTAL-NEXT V2 — Análise de Faturamentos (08/11/2026, só Master). Sobre module-system.css.
-   Faixas: Normal verde, Em atenção amarelo, Urgência laranja, Grave vermelho. No celular a lista vira cartões.
-   Tudo prefixado com .fat* para não vazar em outros módulos. */
-.fatPage { --fat-normal: #3ac978; --fat-atencao: #f5c518; --fat-urgencia: #ff8c1a; --fat-grave: #e3262f; }
+/* PORTAL-NEXT V2 — Análise de Faturamentos (só Master). Layout refeito em 09/11/2026. Sobre module-system.css.
+   Faixas: Normal verde, Em atenção amarelo, Urgência laranja, Grave vermelho. No celular a lista vira cartões e o
+   "+ detalhes" abre em tela cheia. Tudo prefixado com .fat* para não vazar em outros módulos. */
+.fatPage { --fat-normal: #3ac978; --fat-atencao: #f5c518; --fat-urgencia: #ff8c1a; --fat-grave: #ee4b57;
+  display: flex; flex-direction: column; gap: var(--mod-space-section-gap); }
 .fatPage .fatNORMAL { --fat-cor: var(--fat-normal); }
 .fatPage .fatATENCAO { --fat-cor: var(--fat-atencao); }
 .fatPage .fatURGENCIA { --fat-cor: var(--fat-urgencia); }
 .fatPage .fatGRAVE { --fat-cor: var(--fat-grave); }
-
-.fatCarga { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; margin: 0 0 var(--mod-space-control-gap); font-size: 0.8125rem; color: var(--color-text-secondary); }
-.fatAviso { color: #f0c64a; }
-.fatFiltros .modSegmentedGroup { display: flex; flex-wrap: wrap; }
-.fatLimpar { min-width: 0; }
-
-.fatKpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-.fatKpiFaixa { text-align: left; background: transparent; color: inherit; font: inherit; cursor: pointer; border-left: 4px solid var(--fat-cor); }
-.fatKpiFaixa > span { display: block; }
-.fatKpiFaixa .modKpiValue { color: var(--fat-cor); }
-.fatKpiFaixa.ativa { background: color-mix(in srgb, var(--fat-cor) 14%, transparent); border-color: var(--fat-cor); }
-.fatKpiFaixa:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
-.fatKpiTotal .modKpiValue { font-size: 2rem; }
-
-.fatTopsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--mod-space-card-gap); }
-.fatTop ol { list-style: none; margin: 6px 0 0; padding: 0; }
-.fatTop li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px solid var(--mod-border); font-size: 0.8125rem; }
-.fatTop li b { color: var(--fat-grave); font-family: var(--font-mono); }
-
-.fatListaTopo { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: var(--mod-space-card-gap); }
+.fatPage > * { margin-top: 0; margin-bottom: 0; }
 .fatMono { font-family: var(--font-mono); letter-spacing: .02em; }
+.fatRotulo { margin: 0; font-size: var(--mod-kpi-label-size); text-transform: uppercase; letter-spacing: .09em; color: var(--mod-muted); font-weight: 600; }
+.fatLink { background: none; border: 0; padding: 0; font: inherit; color: var(--mod-accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.fatLink:focus-visible, .fatMais:focus-visible, .fatBarSeg:focus-visible, .fatLeg:focus-visible, .fatFechar:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.fatSr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.fatNum { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fatCorta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fatBadge { display: inline-block; font-family: var(--font-mono); font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
   padding: 3px 8px; border-radius: var(--radius-sm); color: var(--fat-cor); border: 1px solid var(--fat-cor); background: color-mix(in srgb, var(--fat-cor) 12%, transparent); white-space: nowrap; }
-.fatTabela .fatLinha td:first-child { box-shadow: inset 4px 0 0 var(--fat-cor); }
-.fatNota { margin-top: 8px; font-size: 0.75rem; }
-.fatBancos { margin-top: var(--mod-space-card-gap); }
 
-/* celular: cartões no lugar da tabela */
-.fatCartoes { display: none; list-style: none; margin: var(--mod-space-control-gap) 0 0; padding: 0; }
-.fatCartao { border: 1px solid var(--mod-border); border-left: 5px solid var(--fat-cor); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 10px; background: var(--color-surface-1); }
+/* 1) topo */
+.fatTopo { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px 24px; flex-wrap: wrap; }
+.fatTopoTexto .modTitle { margin: 2px 0 4px; }
+.fatTopoTexto .modSubtitle { margin: 0; }
+.fatTopoAcoes { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fatSelo { font-size: 0.75rem; color: var(--color-text-secondary); border: 1px solid var(--mod-border-strong); border-radius: 999px; padding: 5px 12px; white-space: nowrap; }
+.fatSelo b { color: var(--color-text-primary); font-family: var(--font-mono); font-weight: 600; }
+.fatSeloAviso { color: var(--fat-atencao); border-color: color-mix(in srgb, var(--fat-atencao) 55%, transparent); background: color-mix(in srgb, var(--fat-atencao) 8%, transparent); }
+.fatSeloAviso b { color: var(--fat-atencao); }
+.fatAvisoCarga { font-size: 0.75rem; color: var(--fat-atencao); margin-top: calc(var(--mod-space-section-gap) * -0.6) !important; }
+
+/* 2) período e filtros */
+.fatPeriodo { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.fatPerSeg { display: flex; flex-wrap: wrap; }
+.fatDatas { display: flex; gap: 10px; flex-wrap: wrap; }
+.fatData { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--color-text-secondary); }
+.fatData input { background: var(--mod-surface-elevated); color: var(--color-text-primary); border: 1px solid var(--mod-border-strong); border-radius: var(--radius-sm); padding: 6px 8px; font: inherit; color-scheme: dark; }
+.fatFora { font-size: 0.8125rem; color: var(--color-text-secondary); margin-top: calc(var(--mod-space-section-gap) * -0.55) !important;
+  border-left: 3px solid var(--mod-accent); padding: 6px 10px; background: rgba(238,75,87,.06); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.fatFora b { color: var(--color-text-primary); }
+.fatFiltros { display: flex; align-items: flex-end; gap: 10px 14px; flex-wrap: wrap; margin-top: calc(var(--mod-space-section-gap) * -0.4) !important; }
+.fatSel { display: flex; flex-direction: column; gap: 4px; min-width: 150px; flex: 0 1 220px; }
+.fatSel span { font-size: var(--mod-field-label-size); text-transform: uppercase; letter-spacing: .08em; color: var(--mod-muted); font-weight: 600; }
+.fatSel select { background: var(--mod-surface-elevated); color: var(--color-text-primary); border: 1px solid var(--mod-border-strong); border-radius: var(--radius-sm); padding: 7px 8px; font: inherit; font-size: 0.8125rem; min-width: 0; }
+.fatLimpar { align-self: flex-end; }
+.fatAtualizando { margin-top: calc(var(--mod-space-section-gap) * -0.5) !important; }
+
+/* 3) resumo: Em aberto + barra das faixas */
+.fatResumo { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2.6fr); gap: var(--mod-space-control-gap);
+  border: 1px solid var(--mod-border); border-radius: var(--radius-md); background: var(--mod-surface-elevated); padding: 20px 22px; }
+.fatAberto { border-right: 1px solid var(--mod-border); padding-right: 20px; }
+.fatAbertoQtd { margin: 6px 0 2px; font-size: 2.6rem; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; }
+.fatAbertoValor { margin: 6px 0 0; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.fatAbertoValor span, .fatAbertoMedia { color: var(--color-text-secondary); font-size: 0.8125rem; }
+.fatAbertoMedia { margin: 10px 0 0; }
+.fatAbertoMedia b { color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+.fatFaixas { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.fatDica { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--mod-muted); }
+.fatFaixas .fatRotulo .fatLink { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.fatBarra { display: flex; height: 38px; border-radius: var(--radius-sm); overflow: hidden; gap: 2px; background: rgba(255,255,255,.03); }
+.fatBarSeg { flex: 1 1 0; min-width: 28px; border: 0; padding: 0 8px; cursor: pointer; background: var(--fat-cor); color: #120708; font: inherit; font-weight: 700;
+  display: flex; align-items: center; justify-content: flex-start; transition: opacity .15s, filter .15s; }
+.fatBarSeg:hover { filter: brightness(1.12); }
+.fatBarSeg.apagada { opacity: .28; }
+.fatBarSeg.ativa { box-shadow: inset 0 0 0 2px #fff; }
+.fatSegNum { font-family: var(--font-mono); font-size: 0.8125rem; }
+.fatBarraVazia { align-self: center; padding: 0 12px; font-size: 0.8125rem; color: var(--mod-muted); }
+.fatLegenda { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.fatLeg { text-align: left; background: transparent; border: 1px solid var(--mod-border); border-radius: var(--radius-sm); padding: 8px 10px; color: inherit; font: inherit; cursor: pointer;
+  display: flex; flex-direction: column; gap: 2px; min-width: 0; transition: border-color .15s, background .15s, opacity .15s; }
+.fatLeg:hover { border-color: var(--fat-cor); }
+.fatLeg.ativa { border-color: var(--fat-cor); background: color-mix(in srgb, var(--fat-cor) 12%, transparent); }
+.fatLeg.apagada { opacity: .45; }
+.fatLegNome { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600; color: var(--fat-cor); }
+.fatLegNome i, .fatGrupoNome i { width: 9px; height: 9px; border-radius: 2px; background: var(--fat-cor); flex: none; }
+.fatLegQtd { font-size: 1.15rem; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fatLegQtd small { font-size: 0.75rem; color: var(--color-text-secondary); }
+.fatLegDias { font-size: 0.6875rem; color: var(--mod-muted); }
+
+/* 5) lista agrupada por faixa */
+.fatLista { display: flex; flex-direction: column; gap: 14px; }
+.fatLista .modSectionTitle { margin: 0; }
+.fatGrupo { border: 1px solid var(--mod-border); border-top: 3px solid var(--fat-cor); border-radius: var(--radius-md); background: var(--mod-surface-elevated); overflow: hidden; }
+.fatGrupoTopo { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0; padding: 12px 16px; font-size: 0.875rem; font-weight: 600; }
+.fatGrupoNome { display: flex; align-items: center; gap: 8px; color: var(--fat-cor); }
+.fatGrupoNome small { font-weight: 400; color: var(--mod-muted); font-size: 0.75rem; }
+.fatGrupoTot { font-variant-numeric: tabular-nums; color: var(--color-text-primary); font-weight: 500; }
+.fatTabela { overflow-x: auto; }
+.fatTab { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.8125rem; }
+.fatTab col.cDias { width: 92px; } .fatTab col.cChassi { width: 190px; } .fatTab col.cModelo { width: auto; }
+.fatTab col.cLoja { width: 130px; } .fatTab col.cBanco { width: 180px; } .fatTab col.cValor { width: 120px; }
+.fatTab col.cData { width: 112px; } .fatTab col.cAcao { width: 112px; }
+.fatTab th { font-size: var(--mod-table-label-size); text-transform: uppercase; letter-spacing: .08em; color: var(--mod-muted); font-weight: 600;
+  text-align: left; padding: 8px 12px; border-top: 1px solid var(--mod-border); border-bottom: 1px solid var(--mod-border); white-space: nowrap; }
+.fatTab th.fatNum { text-align: right; }
+.fatTab td { height: 52px; padding: 0 12px; border-bottom: 1px solid var(--mod-border); vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fatTab tbody tr:last-child td { border-bottom: 0; }
+.fatTab tbody tr:hover td { background: var(--mod-surface-hover); }
+.fatColDias { text-align: right; padding-right: 18px !important; }
+.fatColDias b { font-size: 1.5rem; font-weight: 600; color: var(--fat-cor); font-variant-numeric: tabular-nums; line-height: 1; }
+.fatTab td.fatMono { font-size: 0.75rem; color: var(--color-text-secondary); }
+.fatColAcao { text-align: right; }
+.fatMais { background: transparent; border: 1px solid var(--mod-border-strong); color: var(--color-text-primary); border-radius: var(--radius-sm);
+  padding: 6px 10px; font: inherit; font-size: 0.75rem; cursor: pointer; white-space: nowrap; }
+.fatMais:hover { border-color: var(--mod-accent); color: var(--mod-accent); }
+.fatNota { margin: 0; font-size: 0.75rem; }
+
+/* 6) prazo médio por banco (compacto) */
+.fatBancos { border-top: 1px solid var(--mod-border); padding-top: var(--mod-space-control-gap); }
+.fatBancos .modSectionTitle { margin: 0 0 2px; font-size: 0.9375rem; }
+.fatBancos > .modMuted { margin: 0 0 10px; font-size: 0.75rem; }
+.fatBancosLista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 18px; }
+.fatBancosLista li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--mod-border); font-size: 0.8125rem; }
+.fatBancosLista li > span:nth-child(2) { color: var(--mod-muted); font-size: 0.75rem; }
+.fatBancosLista b { font-weight: 600; }
+.fatBancosLista small { font-weight: 400; color: var(--mod-muted); font-size: 0.6875rem; }
+
+/* painel "+ detalhes" (lateral no computador, tela cheia no celular) */
+.fatVeu { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1200; }
+.fatDetalhe { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); z-index: 1201; background: var(--color-canvas, #0b0b0c);
+  border-left: 1px solid var(--mod-border-strong); box-shadow: -18px 0 40px rgba(0,0,0,.45); overflow-y: auto; padding: 22px 24px 32px;
+  display: flex; flex-direction: column; gap: 18px; }
+.fatDetTopo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.fatDetTopo .modEyebrow { margin: 0 0 4px; }
+.fatDetTitulo { margin: 0; font-size: 1.15rem; font-weight: 500; overflow-wrap: anywhere; }
+.fatFechar { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--mod-border-strong); background: transparent; color: var(--color-text-primary);
+  font-size: 1.35rem; line-height: 1; cursor: pointer; }
+.fatFechar:hover { border-color: var(--mod-accent); color: var(--mod-accent); }
+.fatDetDestaque { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border: 1px solid var(--mod-border); border-left: 4px solid var(--fat-cor);
+  border-radius: var(--radius-md); background: color-mix(in srgb, var(--fat-cor) 7%, transparent); }
+.fatDetDestaque b { font-size: 2.2rem; font-weight: 600; color: var(--fat-cor); line-height: 1; font-variant-numeric: tabular-nums; }
+.fatDetDestaque span:not(.fatBadge) { flex: 1; font-size: 0.8125rem; color: var(--color-text-secondary); }
+.fatDetLista { margin: 0; display: flex; flex-direction: column; }
+.fatDetLista > div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--mod-border); }
+.fatDetLista dt { font-size: var(--mod-field-label-size); text-transform: uppercase; letter-spacing: .08em; color: var(--mod-muted); font-weight: 600; padding-top: 2px; }
+.fatDetLista dd { margin: 0; font-size: 0.875rem; overflow-wrap: anywhere; }
+.fatComDetalhe { overflow: hidden; }
+
+/* celular: cartões no lugar da tabela; detalhe em tela cheia */
+.fatCartoes { display: none; list-style: none; margin: 0; padding: 0 12px 12px; }
+.fatCartao { border: 1px solid var(--mod-border); border-left: 4px solid var(--fat-cor); border-radius: var(--radius-md); padding: 12px 14px; margin-top: 10px; background: var(--color-canvas, transparent); }
 .fatCartaoTopo { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.fatDias { font-family: var(--font-mono); color: var(--fat-cor); font-size: 1rem; }
-.fatCliente { margin: 8px 0 2px; font-weight: 600; font-size: 0.875rem; overflow-wrap: anywhere; }
-.fatCartao .fatMono { margin: 0; font-size: 0.75rem; color: var(--color-text-secondary); overflow-wrap: anywhere; }
-.fatCartao dl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin: 10px 0 0; }
+.fatCartaoDias { font-size: 0.75rem; color: var(--color-text-secondary); white-space: nowrap; }
+.fatCartaoDias b { font-size: 1.6rem; font-weight: 600; color: var(--fat-cor); font-variant-numeric: tabular-nums; vertical-align: -2px; margin-right: 2px; }
+.fatCartaoModelo { margin: 10px 0 2px; font-weight: 600; font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fatCartaoChassi { margin: 0; font-size: 0.75rem; color: var(--color-text-secondary); }
+.fatCartao dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin: 10px 0 12px; }
 .fatCartao dt { font-size: 0.625rem; text-transform: uppercase; letter-spacing: .06em; color: var(--mod-muted); }
-.fatCartao dd { margin: 1px 0 0; font-size: 0.8125rem; overflow-wrap: anywhere; }
+.fatCartao dd { margin: 1px 0 0; font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fatCartao .fatMais { width: 100%; padding: 9px 10px; }
+
+@media (max-width: 1100px) {
+  .fatTab col.cLoja { width: 110px; } .fatTab col.cBanco { width: 150px; } .fatTab col.cChassi { width: 170px; }
+}
+@media (max-width: 860px) {
+  .fatResumo { grid-template-columns: 1fr; }
+  .fatAberto { border-right: 0; border-bottom: 1px solid var(--mod-border); padding: 0 0 14px; }
+  .fatLegenda { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 760px) {
   .fatTabela { display: none; }
   .fatCartoes { display: block; }
-  .fatFiltros .modField { min-width: 0; flex: 1 1 140px; }
-  .fatKpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .fatKpiTotal { grid-column: 1 / -1; }
+  .fatTopo { align-items: flex-start; }
+  .fatTopoAcoes { width: 100%; justify-content: space-between; }
+  .fatSel { flex: 1 1 140px; }
+  .fatResumo { padding: 16px; }
+  .fatDetalhe { width: 100vw; border-left: 0; padding: 18px 16px 28px; }
+  .fatDetLista > div { grid-template-columns: 1fr; gap: 2px; }
 }
-
-/* computador: as 11 colunas cabem sem rolar para o lado (cliente, modelo e vendedor quebram linha) */
-.fatTabela .modTable { width: 100%; font-size: 0.78rem; }
-.fatTabela .modTable th, .fatTabela .modTable td { padding: 7px 8px; }
-.fatTabela .modTable td:nth-child(2), .fatTabela .modTable td:nth-child(3), .fatTabela .modTable td:nth-child(5) { white-space: normal; min-width: 110px; }
-.fatTabela .modTable td:nth-child(1) { font-size: 0.72rem; }
