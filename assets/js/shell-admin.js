@@ -2800,6 +2800,7 @@
     if (dry.aviso_tabela_geral) avisosExtras.push(dry.aviso_tabela_geral);
     if (dry.base_compartilhada) avisosExtras.push(dry.base_compartilhada);
     if (Array.isArray(m.argsBase.p_avisos)) m.argsBase.p_avisos.forEach(function (a) { avisosExtras.push(a); });
+    if (comp.detalhe_novos && comp.detalhe_novos.length) avisosExtras.push('Serão incluídos (novos no arquivo): ' + comp.detalhe_novos.join(', '));
     if (comp.detalhe_removidos && comp.detalhe_removidos.length) avisosExtras.push('Serão removidos (não estão no arquivo): ' + comp.detalhe_removidos.join(', '));
     if (dry.linhas_coeficiente) avisosExtras.push(dry.linhas_coeficiente + ' linha(s) para a tabela de coeficiente (prazo/taxa→coeficiente) também presentes — comparação separada, não exibida nesta prévia resumida.');
     var avisosHtml = avisosExtras.length ? '<div class="gbWarn">' + avisosExtras.map(function (a) { return '<div>⚠️ ' + esc(a) + '</div>'; }).join('') + '</div>' : '';
