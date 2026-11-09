@@ -348,15 +348,15 @@
     {
       "id": "analise-faturamentos",
       "permissionId": "analiseFaturamentos",
-      "authMode": "MASTER_ONLY",
+      "authMode": "ANALISTA_OR_MASTER",
       "name": "Análise de Faturamentos",
       "route": "/analise-faturamentos",
       "title": "Análise de Faturamentos",
       "density": "MEDIUM-HIGH (resumo + filtros + lista chassi a chassi exportável; cartões no celular)",
-      "authRequirement": "session + MASTER (menu/rota) + master_faturamentos SECURITY DEFINER confere o Master no banco a cada chamada",
+      "authRequirement": "session + MASTER ou ANALISTA (menu/rota) + faturamentos_analise / fat_justificar / fat_justificativas (SECURITY DEFINER) conferem Master ou Analista ATIVO no banco a cada chamada; Exportar Excel só Master (master_faturamentos)",
       "designPattern": "módulo novo (08/11/2026) sobre module-system.css + analise-faturamentos.css",
       "entryPoint": "assets/js/analise-faturamentos.js (NX_ANALISE_FATURAMENTOS_PAGE) + assets/css/analise-faturamentos.css",
-      "businessSource": "Servidor: migração 20261108170000_analise_faturamentos.sql (master_faturamentos, _fat_marcos, _fat_dias_uteis, _fat_feriados); fonte = Base 03 (SPF) + Base 02 + Base 01, a mesma da Análise F&I do Grupo",
+      "businessSource": "Servidor: migrações 20261108170000_analise_faturamentos.sql (master_faturamentos, _fat_marcos, _fat_dias_uteis, _fat_feriados) e 20261109150000_faturamentos_analistas_justificativas.sql (faturamentos_analise, fat_justificar, fat_justificativas, tabela fat_justificativas só de acréscimo); fonte = Base 03 + Base 02 + Base 01, a mesma da Análise F&I do Grupo",
       "functionalSource": null,
       "approvedReference": null,
       "migrationWave": null,
@@ -364,7 +364,7 @@
       "migrationStatus": "TECH_READY_HUMAN_UAT_PENDING",
       "landingTitle": "Análise de Faturamentos",
       "landingDesc": "Propostas faturadas e ainda sem pagamento do banco: dias úteis em aberto, faixas e prazo por banco.",
-      "notes": "Só Master. Datas de faturamento/pagamento = 1ª carga do SPF com FATURADA/PAGA (opção A) até o relatório do SPF trazer as colunas (opção B: trocar só _fat_marcos)."
+      "notes": "Master e Analistas ativos (todas as lojas); Exportar só Master; Justificar demora em Em atenção/Urgência/Grave (09/11/2026). Datas de faturamento/pagamento = 1ª carga do SPF com FATURADA/PAGA (opção A) até o relatório do SPF trazer as colunas (opção B: trocar só _fat_marcos)."
     }
   ]
 }

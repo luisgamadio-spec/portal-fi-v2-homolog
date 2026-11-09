@@ -87,18 +87,18 @@
 .fatGrupoTot { font-variant-numeric: tabular-nums; color: var(--color-text-primary); font-weight: 500; }
 .fatTabela { overflow-x: auto; }
 .fatTab { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.8125rem; }
-.fatTab col.cDias { width: 92px; } .fatTab col.cChassi { width: 190px; } .fatTab col.cModelo { width: auto; }
-.fatTab col.cLoja { width: 130px; } .fatTab col.cBanco { width: 180px; } .fatTab col.cValor { width: 120px; }
-.fatTab col.cData { width: 112px; } .fatTab col.cAcao { width: 112px; }
-.fatTab th { font-size: var(--mod-table-label-size); text-transform: uppercase; letter-spacing: .08em; color: var(--mod-muted); font-weight: 600;
-  text-align: left; padding: 8px 12px; border-top: 1px solid var(--mod-border); border-bottom: 1px solid var(--mod-border); white-space: nowrap; }
+.fatTab col.cDias { width: 92px; } .fatTab col.cChassi { width: 150px; } .fatTab col.cModelo { width: auto; }
+.fatTab col.cLoja { width: 104px; } .fatTab col.cBanco { width: 126px; } .fatTab col.cValor { width: 100px; }
+.fatTab col.cData { width: 104px; } .fatTab col.cJust { width: 172px; } .fatTab col.cAcao { width: 236px; }
+.fatTab th { font-size: var(--mod-table-label-size); text-transform: uppercase; letter-spacing: .05em; overflow: hidden; text-overflow: clip; color: var(--mod-muted); font-weight: 600;
+  text-align: left; padding: 8px 8px; border-top: 1px solid var(--mod-border); border-bottom: 1px solid var(--mod-border); white-space: nowrap; }
 .fatTab th.fatNum { text-align: right; }
-.fatTab td { height: 52px; padding: 0 12px; border-bottom: 1px solid var(--mod-border); vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fatTab td { height: 52px; padding: 0 8px; border-bottom: 1px solid var(--mod-border); vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fatTab tbody tr:last-child td { border-bottom: 0; }
 .fatTab tbody tr:hover td { background: var(--mod-surface-hover); }
-.fatColDias { text-align: right; padding-right: 18px !important; }
+.fatColDias { text-align: right; padding-right: 14px !important; }
 .fatColDias b { font-size: 1.5rem; font-weight: 600; color: var(--fat-cor); font-variant-numeric: tabular-nums; line-height: 1; }
-.fatTab td.fatMono { font-size: 0.75rem; color: var(--color-text-secondary); }
+.fatTab td.fatMono { font-size: 0.7rem; color: var(--color-text-secondary); letter-spacing: 0; }
 .fatColAcao { text-align: right; }
 .fatMais { background: transparent; border: 1px solid var(--mod-border-strong); color: var(--color-text-primary); border-radius: var(--radius-sm);
   padding: 6px 10px; font: inherit; font-size: 0.75rem; cursor: pointer; white-space: nowrap; }
@@ -150,7 +150,7 @@
 .fatCartao .fatMais { width: 100%; padding: 9px 10px; }
 
 @media (max-width: 1100px) {
-  .fatTab col.cLoja { width: 110px; } .fatTab col.cBanco { width: 150px; } .fatTab col.cChassi { width: 170px; }
+  .fatTab { min-width: 1080px; }
 }
 @media (max-width: 860px) {
   .fatResumo { grid-template-columns: 1fr; }
@@ -166,4 +166,58 @@
   .fatResumo { padding: 16px; }
   .fatDetalhe { width: 100vw; border-left: 0; padding: 18px 16px 28px; }
   .fatDetLista > div { grid-template-columns: 1fr; gap: 2px; }
+}
+
+/* 09/11/2026 — Justificar demora (Analistas e Master) */
+.fatColJust { overflow: visible !important; }
+.fatJust { display: inline-block; font-size: 0.6875rem; font-weight: 600; padding: 3px 8px; border-radius: 999px; white-space: nowrap; border: 1px solid; }
+.fatJustSem { color: var(--fat-grave); border-color: color-mix(in srgb, var(--fat-grave) 60%, transparent); background: color-mix(in srgb, var(--fat-grave) 10%, transparent); }
+.fatJustOk { color: var(--fat-normal); border-color: color-mix(in srgb, var(--fat-normal) 55%, transparent); background: color-mix(in srgb, var(--fat-normal) 9%, transparent); }
+.fatJustVelha { color: var(--fat-atencao); border-color: color-mix(in srgb, var(--fat-atencao) 55%, transparent); background: color-mix(in srgb, var(--fat-atencao) 9%, transparent); }
+.fatJustNa { color: var(--mod-muted); }
+.fatTab td.fatColAcao { overflow: visible; padding-right: 10px; }
+.fatColAcao .fatJustBtn { margin-right: 6px; }
+.fatTab .fatColAcao .fatJustBtn, .fatTab .fatColAcao .fatMais { padding: 6px 9px; }
+.fatJustBtn { background: transparent; border: 1px solid color-mix(in srgb, var(--mod-accent) 70%, transparent); color: var(--mod-accent); border-radius: var(--radius-sm);
+  padding: 6px 10px; font: inherit; font-size: 0.75rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.fatJustBtn:hover { background: rgba(238,75,87,.1); }
+.fatJustBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.fatJustBtnForte { background: var(--mod-accent); color: #1a0506; border-color: var(--mod-accent); }
+.fatJustBtnForte:hover { background: #f16571; }
+.fatOk { font-size: 0.8125rem; color: var(--fat-normal); border-left: 3px solid var(--fat-normal); padding: 6px 10px; background: color-mix(in srgb, var(--fat-normal) 8%, transparent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-top: calc(var(--mod-space-section-gap) * -0.5) !important; }
+.fatDetJust { margin-top: -6px; }
+.fatHist { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--mod-border-strong); padding-top: 16px; }
+.fatHistTopo { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.fatHistTitulo { margin: 0; font-size: 0.9375rem; font-weight: 600; }
+.fatHistLista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.fatHistLista li { border: 1px solid var(--mod-border); border-radius: var(--radius-md); padding: 10px 12px; background: var(--mod-surface-elevated); }
+.fatHistLista li:first-child { border-color: var(--mod-border-strong); }
+.fatHistCab { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 0.8125rem; }
+.fatHistCab span { color: var(--mod-muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.fatHistTexto { margin: 6px 0 4px; font-size: 0.8125rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fatHistAutor { margin: 0; font-size: 0.6875rem; color: var(--color-text-secondary); }
+.fatErroForm { margin: 0; color: var(--fat-grave); font-size: 0.8125rem; }
+.fatFormSub { margin: 4px 0 0; font-size: 0.75rem; color: var(--color-text-secondary); }
+.fatFormCorpo { display: flex; flex-direction: column; gap: 12px; }
+.fatMotivos { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.fatMotivos legend, .fatTextoRot { font-size: var(--mod-field-label-size); text-transform: uppercase; letter-spacing: .08em; color: var(--mod-muted); font-weight: 600; padding: 0; margin-bottom: 6px; }
+.fatTextoRot span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.fatMotivo { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--mod-border); border-radius: var(--radius-sm); cursor: pointer; font-size: 0.875rem; }
+.fatMotivo:hover { border-color: var(--mod-border-strong); }
+.fatMotivo:has(input:checked) { border-color: var(--mod-accent); background: rgba(238,75,87,.08); }
+.fatMotivo input { accent-color: var(--mod-accent); width: 16px; height: 16px; margin: 0; }
+.fatMotivo input:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+#fatTexto { width: 100%; box-sizing: border-box; min-height: 110px; resize: vertical; background: var(--mod-surface-elevated); color: var(--color-text-primary);
+  border: 1px solid var(--mod-border-strong); border-radius: var(--radius-sm); padding: 10px 12px; font: inherit; font-size: 0.875rem; line-height: 1.45; }
+#fatTexto:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+.fatContador { margin: -6px 0 0; font-size: 0.75rem; color: var(--mod-muted); text-align: right; }
+.fatContador.ok { color: var(--fat-normal); }
+.fatFormNota { margin: 0; font-size: 0.75rem; }
+.fatFormAcoes { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
+.fatCartaoJust { margin: 8px 0 0; }
+.fatCartaoAcoes { display: flex; gap: 8px; }
+.fatCartaoAcoes > button { flex: 1 1 0; padding: 9px 10px; }
+@media (max-width: 760px) {
+  .fatFormAcoes > .modBtn { flex: 1 1 0; }
 }
