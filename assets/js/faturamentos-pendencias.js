@@ -3,13 +3,17 @@
    em aberto nas lojas em que ele é o Analista responsável VIGENTE (faturamentos_minhas_pendencias; se o Master
    trocar o responsável, as pendências passam para o novo). Havendo, mostra este aviso. Ele volta em todo acesso até o
    responsável registrar a justificativa da proposta na Análise de Faturamentos. Sem CPF e sem nome do cliente.
-   No homolog, só a conta de teste recebe pendências (pedidos feitos no homolog são teste). */
+   No homolog, só a conta de teste recebe pendências (pedidos feitos no homolog são teste).
+   10/11/2026 (pedido do Luis): "Fechar por agora" continua, mas o aviso volta a cada acesso E a cada 30 minutos com o
+   Portal aberto, até a justificativa ser registrada (a cada 30 min pergunta de novo ao banco; sem pendência, nada aparece). */
 (function () {
   'use strict';
 
   var LOJA = { ABC: 'ABC', ALPHAVILLE: 'Alphaville', 'ANALIA FRANCO': 'Anália Franco', BANDEIRANTES: 'Bandeirantes',
     'BARRA FUNDA': 'Barra Funda', EUROPA: 'Europa', GASTAO: 'Gastão', NACOES: 'Nações' };
-  var mostrado = false, focoAntes = null;
+  var mostrado = false, focoAntes = null, timer = null, ultima = 0;
+  // 30 minutos; window.NX_FAT_AVISO_INTERVALO_MS só existe para teste automático
+  function intervalo() { var t = Number(window.NX_FAT_AVISO_INTERVALO_MS); return t > 0 ? t : 30 * 60 * 1000; }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
@@ -87,18 +91,33 @@
 
   function verificar(ctx) {
     if (!ctx || ctx.perfil !== 'ANALISTA') return;   // só Analistas são responsáveis por loja
+    ultima = Date.now();
     buscar().then(function (l) { if (Array.isArray(l)) mostrar(l); });
   }
+  function agendar() {
+    parar();
+    timer = setInterval(function () {
+      if (!window.NX_AUTH_CORE || window.NX_AUTH_CORE.getState() !== 'AUTHORIZED') return;
+      verificar(window.NX_AUTH_CORE.getContext());
+    }, intervalo());
+  }
+  function parar() { if (timer) { clearInterval(timer); timer = null; } }
+  // aba que ficou em segundo plano (o navegador atrasa o relógio): ao voltar, confere se já passou o intervalo
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible' || !timer || Date.now() - ultima < intervalo()) return;
+    if (window.NX_AUTH_CORE && window.NX_AUTH_CORE.getState() === 'AUTHORIZED') verificar(window.NX_AUTH_CORE.getContext());
+  });
 
   function ligar() {
     if (!window.NX_AUTH_CORE || typeof window.NX_AUTH_CORE.onStateChange !== 'function') return;
     window.NX_AUTH_CORE.onStateChange(function (state, ctx) {
-      if (state === 'AUTHORIZED') { if (!mostrado) { mostrado = true; verificar(ctx); } }
-      else { mostrado = false; fechar(); }
+      if (state === 'AUTHORIZED') { if (!mostrado) { mostrado = true; verificar(ctx); if (ctx && ctx.perfil === 'ANALISTA') agendar(); } }
+      else { mostrado = false; parar(); fechar(); }
     });
     // se o Portal já estava liberado quando este arquivo carregou
     if (window.NX_AUTH_CORE.getState && window.NX_AUTH_CORE.getState() === 'AUTHORIZED' && !mostrado) {
       mostrado = true; verificar(window.NX_AUTH_CORE.getContext());
+      var c0 = window.NX_AUTH_CORE.getContext(); if (c0 && c0.perfil === 'ANALISTA') agendar();
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ligar); else ligar();
