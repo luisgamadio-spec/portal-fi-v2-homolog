@@ -2780,6 +2780,20 @@
   function gsProgressBodyHtml() {
     return '<div class="gbProgressWrap"><div class="gbProgressBar" style="width:60%"></div></div><p class="note">Lendo e validando o arquivo localmente antes de qualquer chamada ao servidor...</p>';
   }
+  // Taxa em % como no simulador: "0%", "0,49%", "1,813%", "1,82%" (até 4 casas, sem zeros sobrando, sem arredondar além das 6 casas do banco)
+  function gsPctPrevia(v) {
+    if (v === null || v === undefined || v === '') return '-';
+    var p = Math.round(Number(v) * 1e6) / 1e4;
+    return p.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 4 }) + '%';
+  }
+  var GS_PREVIA_COLUNAS = {
+    TAXA_BOTAO_COMBINACAO: [
+      { k: 'prazo', t: 'Prazo', f: function (v) { return v === null || v === undefined ? '-' : v + 'x'; } },
+      { k: 'taxa_simulador', t: 'Taxa do simulador', f: gsPctPrevia },
+      { k: 'taxa_copiar_hoje', t: 'Taxa copiar hoje', f: gsPctPrevia },
+      { k: 'taxa_copiar_nova', t: 'Taxa copiar nova', f: gsPctPrevia }
+    ]
+  };
   // Generic diff renderer -- most RPCs return `comparacao_com_active`;
   // Coparticipado/Semestral return `comparacao_matriz_modelo` (its own
   // name, since there is a SECOND independent comparison for the
@@ -2790,10 +2804,13 @@
     var comp = dry.comparacao_com_active || dry.comparacao_matriz_modelo || {};
     var novos = comp.novos || 0, alterados = comp.alterados || 0, semAlt = comp.sem_alteracao || 0, removidos = comp.removidos || 0;
     var detalhes = comp.detalhe_alterados || [];
-    var cols = detalhes.length ? Object.keys(detalhes[0]) : [];
+    // 10/11/2026: bases com colunas próprias na prévia (títulos em português, valores como no simulador e cartões no celular)
+    var colsProprias = GS_PREVIA_COLUNAS[dry.tipo_base];
+    var cols = colsProprias || (detalhes.length ? Object.keys(detalhes[0]).map(function (c) { return { k: c, t: c, f: GS_VM.gsFmtValor }; }) : []);
     var detalheHtml = detalhes.length
-      ? '<div class="gsTableWrap"><table class="gsTable"><thead><tr>' + cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead>' +
-        '<tbody>' + detalhes.map(function (r) { return '<tr>' + cols.map(function (c) { return '<td>' + esc(GS_VM.gsFmtValor(r[c])) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>'
+      ? '<div class="gsTableWrap' + (colsProprias ? ' gsPreviaWrap' : '') + '"><table class="gsTable' + (colsProprias ? ' gsPreviaCartoes' : '') + '"><thead><tr>' +
+        cols.map(function (c) { return '<th>' + esc(c.t) + '</th>'; }).join('') + '</tr></thead>' +
+        '<tbody>' + detalhes.map(function (r) { return '<tr>' + cols.map(function (c) { return '<td data-label="' + esc(c.t) + '">' + esc(c.f(r[c.k])) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>'
       : '<p class="note">Nenhuma linha com valor alterado em relação à base ACTIVE atual.</p>';
 
     var avisosExtras = [];
