@@ -136,6 +136,7 @@
     return '<span class="fatRet fatRetAberto" title="' + esc('Pedido por ' + titulo(t.solicitado_por) + (t.email_erro ? ' — o e-mail não saiu; o aviso no Portal foi criado' : '')) + '">' +
       'Retorno solicitado ' + esc(diaHora(t.solicitado_em)) + (t.teste ? ' · teste' : '') + '</span>';
   }
+  function tituloForm(r) { return ligado(r) && r.modelo ? r.modelo : 'Proposta nº ' + r.proposta; }
   function podePedirRetorno(r) { return pode('pode_solicitar_retorno') && r.faixa !== 'NORMAL' && !retornoAberto(r); }
   function fatTxt(r) { return (r.faturamento_desde_inicio ? 'até ' : '') + data(r.faturamento); }
   function badge(f) { return '<span class="fatBadge fat' + f + '">' + esc(FAIXA_LABEL[f] || f) + '</span>'; }
@@ -383,7 +384,7 @@
     var n = (F.texto || '').trim().length;
     return '<div class="fatVeu" data-acao="cancelar"></div>' +
       '<aside class="fatDetalhe fatForm fat' + r.faixa + '" role="dialog" aria-modal="true" aria-labelledby="fatFormTitulo">' +
-      '<div class="fatDetTopo"><div><p class="modEyebrow">Justificar demora</p><h2 id="fatFormTitulo" class="fatDetTitulo">' + esc(seLigado(r, r.modelo)) + '</h2>' +
+      '<div class="fatDetTopo"><div><p class="modEyebrow">Justificar demora</p><h2 id="fatFormTitulo" class="fatDetTitulo">' + esc(tituloForm(r)) + '</h2>' +
       '<p class="fatFormSub"><span class="fatMono">' + esc(chassiDe(r)) + '</span> · ' + esc(loja(r.loja)) + ' · ' + esc(r.banco || '—') + '</p></div>' +
       '<button type="button" class="fatFechar" data-acao="cancelar" aria-label="Fechar sem salvar">×</button></div>' +
       '<div class="fatDetDestaque"><b>' + esc(r.dias) + '</b><span>dias úteis em aberto</span>' + badge(r.faixa) + '</div>' +
@@ -405,7 +406,7 @@
     if (!r) return '';
     return '<div class="fatVeu" data-acao="cancelar"></div>' +
       '<aside class="fatDetalhe fatForm fat' + r.faixa + '" role="dialog" aria-modal="true" aria-labelledby="fatRetTitulo">' +
-      '<div class="fatDetTopo"><div><p class="modEyebrow">Solicitar retorno urgente</p><h2 id="fatRetTitulo" class="fatDetTitulo">' + esc(seLigado(r, r.modelo)) + '</h2>' +
+      '<div class="fatDetTopo"><div><p class="modEyebrow">Solicitar retorno urgente</p><h2 id="fatRetTitulo" class="fatDetTitulo">' + esc(tituloForm(r)) + '</h2>' +
       '<p class="fatFormSub"><span class="fatMono">' + esc(chassiDe(r)) + '</span> · ' + esc(loja(r.loja)) + ' · ' + esc(r.banco || '—') + '</p></div>' +
       '<button type="button" class="fatFechar" data-acao="cancelar" aria-label="Fechar sem pedir">×</button></div>' +
       '<div class="fatDetDestaque"><b>' + esc(r.dias) + '</b><span>dias úteis em aberto</span>' + badge(r.faixa) + '</div>' +
