@@ -95,3 +95,6 @@ body.asstAberto .baiLauncherRoot { display: none; }   /* o botão flutuante da B
 .asstCardsUm { grid-template-columns: minmax(0, 420px); }
 .asstCaber { display: grid; gap: 10px; }
 .asstCaber > b { font-size: .9rem; color: var(--color-text-primary); }
+
+/* 11/11/2026: com PJ selecionado no Linear, o assistente (que usa só taxas PF) fica escondido */
+body.smPessoaPJ .asstBar, body.smPessoaPJ .asstPop { display: none !important; }
