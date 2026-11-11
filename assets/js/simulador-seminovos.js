@@ -504,6 +504,20 @@
     var ro = UI.wireTermResultGrid(grid, 130, itemCount);
     if (ro) termGridObservers.push(ro);
   }
+  // 11/11/2026 (Luis): na PJ podem faltar prazos (ex.: 7 cards). A regra da PF exige linhas completas e, com um número
+  // primo de cards, cai para 1 coluna. Aqui: até 4 por linha, quantos couberem com 130px (4 no computador, 2 no celular),
+  // mesmo tamanho de card; só a última linha pode ficar menor. A PF continua com a regra de sempre (wireResultTermGrid acima).
+  function wirePjTermGrid() {
+    var grid = document.querySelector('#smResultRegion .smTermGrid');
+    if (!grid) return;
+    function recompute() {
+      var w = grid.clientWidth || (grid.parentElement && grid.parentElement.clientWidth) || 0;
+      var escala = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
+      grid.style.setProperty('--term-grid-cols', String(Math.max(1, Math.min(4, Math.floor(w / (130 * escala))))));
+    }
+    recompute();
+    if (window.ResizeObserver) { var ro = new ResizeObserver(recompute); ro.observe(grid); termGridObservers.push(ro); }
+  }
 
   function formHtml(mode) {
     switch (mode) {
@@ -802,7 +816,7 @@
     setResult('<div class="smResultHead"><p class="kpiLabel">Parcela por prazo — PJ</p>' +
       '<p class="smResultHeadNote">Ano ' + UI.esc(r.band || '—') + ' · taxa PJ da faixa de entrada a partir de ' + r.eBand + '%' +
       (terms.length < r.terms.length ? ' · prazos sem taxa PJ não aparecem' : '') + '</p></div>' + html);
-    wireResultTermGrid(terms.length);
+    wirePjTermGrid();
   }
   function calcDescobridor() {
     var r = SN.calcularDescobridor({ financiado: UI.moneyVal('sFinanciado'), prazo: UI.numVal('sPrazoNum'), parcela: UI.moneyVal('sParcela') });
