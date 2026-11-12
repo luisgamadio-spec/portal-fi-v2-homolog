@@ -549,7 +549,7 @@
         (p ? '<dl class="fatDetLista">' + item('Data do crédito', esc(dataLonga(p.data_credito))) + item('Conta que recebeu (loja)', esc(loja(p.conta_loja))) +
           item('Valor creditado', esc(brl2(p.valor_creditado))) + item('Valor financiado', esc(brl2(p.valor_esperado))) +
           (Number(p.diferenca) ? item('Diferença', esc(brl2(p.diferenca))) + item('Motivo', esc(p.motivo || '—')) : '') +
-          item('Preenchido por', esc(titulo(p.por) || '—') + ' <small>' + esc(dataHora(p.em)) + '</small>') + '</dl>' + seloOutraLoja(r)
+          item('Preenchido por', esc(titulo(p.por) || '—') + ' <small>' + esc(dataHora(p.em)) + '</small>') + '</dl>'
           : '<p class="fatDetFalta">' + seloCompletar(r) + ' Faltam a data do crédito, a loja da conta que recebeu e o valor creditado.</p>') + '</section>';
     }
     if (r.subsidiado) {
