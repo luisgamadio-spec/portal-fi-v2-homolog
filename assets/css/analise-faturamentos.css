@@ -293,6 +293,10 @@
 .fatApoioFalta i { width: 7px; height: 7px; border-radius: 50%; background: var(--fat-atencao); display: inline-block; }
 .fatApoioFalta .fatLink { font-size: 0.75rem; font-weight: 500; color: var(--color-text-secondary); }
 .fatApoioFalta .fatLink:hover { color: var(--color-text-primary); }
+/* 18/11/2026: valor da Base 03 (sem o líquido da Base 02) — marca visível */
+.fatValBase03 { display: inline-block; margin-left: 4px; font-size: 0.625rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; vertical-align: 1px;
+  color: var(--fat-atencao); border: 1px solid color-mix(in srgb, var(--fat-atencao) 55%, transparent); border-radius: 999px; padding: 1px 6px; white-space: nowrap; cursor: help; }
+.fatNum .fatValBase03 { display: block; width: fit-content; margin: 3px 0 0 auto; }
 .fatCompletar, .fatOutraLoja, .fatSubs, .fatRebOk { display: inline-block; font-size: 0.6875rem; font-weight: 600; padding: 3px 8px; border-radius: 999px; border: 1px solid; white-space: normal; }
 .fatCompletar { color: var(--fat-atencao); border-color: color-mix(in srgb, var(--fat-atencao) 60%, transparent); background: color-mix(in srgb, var(--fat-atencao) 12%, transparent); }
 .fatOutraLoja { color: #8fb4ff; border-color: color-mix(in srgb, #8fb4ff 60%, transparent); background: color-mix(in srgb, #8fb4ff 10%, transparent); }

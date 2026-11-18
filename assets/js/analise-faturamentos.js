@@ -149,6 +149,13 @@
   function fatTxt(r) { return (r.faturamento_desde_inicio ? 'até ' : '') + data(r.faturamento); }
   function badge(f) { return '<span class="fatBadge fat' + f + '">' + esc(FAIXA_LABEL[f] || f) + '</span>'; }
   function soma(l) { return l.reduce(function (s, r) { return s + Number(r.financiado || 0); }, 0); }
+  // 18/11/2026 (Luis, opção A): "financiado" = líquido da Base 02 ("Valor Serviço") pelo chassi. Sem essa ligação vem o valor
+  // da Base 03 (com tarifas embutidas) e aparece a marca "com tarifas".
+  var MARCA_BASE03 = 'Sem ligação com a Base 02: valor da Base 03, com tarifas embutidas';
+  function semLiquido(r) { return r.financiado_fonte === 'BASE03'; }
+  function finTxt(r, fmt) {
+    return esc((fmt || brl2)(r.financiado)) + (semLiquido(r) ? ' <span class="fatValBase03" title="' + MARCA_BASE03 + '">com tarifas</span>' : '');
+  }
   function opcoes(lista) { var s = {}; lista.forEach(function (x) { if (x) s[x] = true; }); return Object.keys(s).sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); }); }
   function pedeJust(r) { return r.faixa !== 'NORMAL'; }
   function podeJust(r) { return pedeJust(r) && pode('pode_justificar'); }
@@ -333,7 +340,7 @@
       '<td class="fatMono">' + esc(chassiDe(r)) + '<br>' + seloOrigem(r) + '</td>' +
       '<td class="fatCorta" title="' + esc(loja(r.loja)) + '">' + esc(loja(r.loja)) + '</td>' +
       '<td class="fatCorta" title="' + esc(r.banco || '—') + '">' + esc(r.banco || '—') + '</td>' +
-      '<td class="fatNum">' + esc(brl2(r.financiado)) + '</td>' +
+      '<td class="fatNum">' + finTxt(r) + '</td>' +
       '<td class="fatNum">' + esc(data(r.faturamento)) + '</td>' +
       '<td class="fatNum">' + (p ? esc(data(p.data_credito)) : '<span class="modMuted">—</span>') + '</td>' +
       '<td class="fatCorta">' + (p ? esc(loja(p.conta_loja)) : '<span class="modMuted">—</span>') + '</td>' +
@@ -350,7 +357,7 @@
       '<p class="fatMono fatCartaoChassi">' + esc(chassiDe(r)) + ' ' + seloOrigem(r) + '</p>' +
       (aCompletar(r) || outraLoja(r) || r.subsidiado ? '<p class="fatCartaoJust">' + seloCompletar(r) + seloOutraLoja(r) + seloSubs(r) + '</p>' : '') +
       '<dl><div><dt>Loja</dt><dd>' + esc(loja(r.loja)) + '</dd></div><div><dt>Banco</dt><dd>' + esc(r.banco || '—') + '</dd></div>' +
-      '<div><dt>Financiado</dt><dd>' + esc(brl2(r.financiado)) + '</dd></div>' +
+      '<div><dt>Financiado</dt><dd>' + finTxt(r) + '</dd></div>' +
       '<div><dt>Crédito</dt><dd>' + (p ? esc(data(p.data_credito)) + ' · ' + esc(loja(p.conta_loja)) : '—') + '</dd></div>' +
       '<div><dt>Valor creditado</dt><dd>' + creditoTxt(r) + '</dd></div>' +
       (r.subsidiado ? '<div><dt>Rebate</dt><dd>' + (r.rebate ? esc(brl2(r.rebate.valor)) : '—') + '</dd></div>' : '') + '</dl>' +
@@ -459,7 +466,7 @@
       '<td class="fatCorta" title="' + esc(seLigado(r, r.modelo)) + '">' + esc(seLigado(r, r.modelo)) + '</td>' +
       '<td class="fatCorta" title="' + esc(loja(r.loja)) + '">' + esc(loja(r.loja)) + '</td>' +
       '<td class="fatCorta" title="' + esc(r.banco || '—') + '">' + esc(r.banco || '—') + '</td>' +
-      '<td class="fatNum">' + esc(brl(r.financiado)) + '</td>' +
+      '<td class="fatNum">' + finTxt(r, brl) + '</td>' +
       '<td class="fatNum">' + esc(fatTxt(r)) + '</td>' +
       '<td class="fatColJust">' + seloJust(r) + seloRetorno(r) + seloCompletar(r) + seloSubs(r) + '</td>' +
       '<td class="fatColAcao">' + acoesLinha(r) +
@@ -472,7 +479,7 @@
       '<p class="fatMono fatCartaoChassi">' + esc(chassiDe(r)) + ' ' + seloOrigem(r) + '</p>' +
       (pedeJust(r) || r.retorno || aCompletar(r) || r.subsidiado ? '<p class="fatCartaoJust">' + (pedeJust(r) ? seloJust(r) : '') + seloRetorno(r) + seloCompletar(r) + seloSubs(r) + '</p>' : '') +
       '<dl><div><dt>Loja</dt><dd>' + esc(loja(r.loja)) + '</dd></div><div><dt>Banco</dt><dd>' + esc(r.banco || '—') + '</dd></div>' +
-      '<div><dt>Financiado</dt><dd>' + esc(brl(r.financiado)) + '</dd></div><div><dt>Faturamento</dt><dd>' + esc(fatTxt(r)) + '</dd></div>' +
+      '<div><dt>Financiado</dt><dd>' + finTxt(r, brl) + '</dd></div><div><dt>Faturamento</dt><dd>' + esc(fatTxt(r)) + '</dd></div>' +
       (r.subsidiado ? '<div><dt>Rebate</dt><dd>' + (r.rebate ? esc(brl2(r.rebate.valor)) : '—') + '</dd></div>' : '') + '</dl>' +
       '<div class="fatCartaoAcoes">' + acoesLinha(r) + '<button type="button" class="fatMais" data-acao="detalhe" data-id="' + esc(r._k) + '">+ detalhes</button></div></li>';
   }
@@ -579,7 +586,7 @@
         item('Pagamento identificado em', esc(dataLonga(r.pagamento_relatorio))) +
         item('Chassi', '<span class="fatMono">' + esc(chassiDe(r)) + '</span>') + item('Ligação do chassi', seloOrigem(r)) +
         item('Modelo', esc(seLigado(r, r.modelo))) + item('Loja', esc(loja(r.loja))) + item('Banco/Financeira', esc(r.banco || '—')) +
-        item('Valor financiado', esc(brl2(r.financiado))) + '</dl>' + historicoHtml(r) + '</aside>';
+        item('Valor financiado', finTxt(r)) + item('Total financiado (com tarifas)', esc(brl2(r.financiado_base03))) + '</dl>' + historicoHtml(r) + '</aside>';
     }
     return '<div class="fatVeu" data-acao="fechar"></div>' +
       '<aside class="fatDetalhe fat' + r.faixa + '" role="dialog" aria-modal="true" aria-labelledby="fatDetTitulo">' +
@@ -598,7 +605,8 @@
       item('Modelo', esc(seLigado(r, r.modelo))) +
       item('Loja', esc(loja(r.loja))) +
       item('Banco/Financeira', esc(r.banco || '—')) +
-      item('Valor financiado', esc(brl(r.financiado))) +
+      item('Valor financiado', finTxt(r)) +
+      item('Total financiado (com tarifas)', esc(brl2(r.financiado_base03))) +
       item('Dias úteis em aberto', esc(r.dias)) +
       item('Faixa', badge(r.faixa)) +
       item('Faturamento identificado em', esc(identificado)) +
@@ -658,7 +666,7 @@
     return '<div class="fatVeu" data-acao="cancelar"></div>' +
       '<aside class="fatDetalhe fatForm fat' + r.faixa + '" role="dialog" aria-modal="true" aria-labelledby="fatVincTitulo">' +
       '<div class="fatDetTopo"><div><p class="modEyebrow">Vincular chassi</p><h2 id="fatVincTitulo" class="fatDetTitulo">' + esc(r.cliente || '—') + '</h2>' +
-      '<p class="fatFormSub">' + esc(loja(r.loja)) + ' · ' + esc(r.banco || '—') + ' · ' + esc(brl(r.financiado)) + ' · inclusão ' + esc(dataLonga(r.inclusao)) + '</p></div>' +
+      '<p class="fatFormSub">' + esc(loja(r.loja)) + ' · ' + esc(r.banco || '—') + ' · ' + finTxt(r, brl) + ' · inclusão ' + esc(dataLonga(r.inclusao)) + '</p></div>' +
       '<button type="button" class="fatFechar" data-acao="cancelar" aria-label="Fechar sem salvar">×</button></div>' +
       '<form class="fatFormCorpo fatVincCorpo" novalidate>' + lista +
       '<label class="fatTextoRot" for="fatVincChassi">Chassi <span>(17 caracteres; precisa estar nas vendas)</span></label>' +
@@ -682,7 +690,7 @@
     return '<div class="fatVeu" data-acao="cancelar"></div>' +
       '<aside class="fatDetalhe fatForm fatFormPag" role="dialog" aria-modal="true" aria-labelledby="fatPagTitulo">' +
       '<div class="fatDetTopo"><div><p class="modEyebrow">' + (r.pagamento ? 'Corrigir dados do crédito' : 'Dados do crédito') + '</p><h2 id="fatPagTitulo" class="fatDetTitulo">' + esc(tituloForm(r)) + '</h2>' +
-      '<p class="fatFormSub"><span class="fatMono">' + esc(chassiDe(r)) + '</span> · ' + esc(loja(r.loja)) + ' · ' + esc(r.banco || '—') + ' · financiado ' + esc(brl2(r.financiado)) + '</p></div>' +
+      '<p class="fatFormSub"><span class="fatMono">' + esc(chassiDe(r)) + '</span> · ' + esc(loja(r.loja)) + ' · ' + esc(r.banco || '—') + ' · financiado ' + finTxt(r) + '</p></div>' +
       '<button type="button" class="fatFechar" data-acao="cancelar" aria-label="Fechar sem salvar">×</button></div>' +
       '<form class="fatFormCorpo fatPagCorpo" novalidate>' +
       '<label class="fatTextoRot" for="fatPagData">Data do crédito</label>' +
@@ -709,7 +717,7 @@
     return '<div class="fatVeu" data-acao="cancelar"></div>' +
       '<aside class="fatDetalhe fatForm fatFormReb" role="dialog" aria-modal="true" aria-labelledby="fatRebTitulo">' +
       '<div class="fatDetTopo"><div><p class="modEyebrow">' + (r.rebate ? 'Corrigir rebate' : 'Rebate da Subsidiada') + '</p><h2 id="fatRebTitulo" class="fatDetTitulo">' + esc(tituloForm(r)) + '</h2>' +
-      '<p class="fatFormSub"><span class="fatMono">' + esc(chassiDe(r)) + '</span> · ' + esc(loja(r.loja)) + ' · ' + esc(r.banco || '—') + ' · financiado ' + esc(brl2(r.financiado)) + '</p></div>' +
+      '<p class="fatFormSub"><span class="fatMono">' + esc(chassiDe(r)) + '</span> · ' + esc(loja(r.loja)) + ' · ' + esc(r.banco || '—') + ' · financiado ' + finTxt(r) + '</p></div>' +
       '<button type="button" class="fatFechar" data-acao="cancelar" aria-label="Fechar sem salvar">×</button></div>' +
       '<form class="fatFormCorpo fatRebCorpo" novalidate>' +
       '<label class="fatTextoRot" for="fatRebValor">Valor do rebate (R$)</label>' +
@@ -863,13 +871,13 @@
       lista = ePagas ? lista.sort(function (a, b) { return String(b.faturamento).localeCompare(String(a.faturamento)); }) : ordenar(lista);
       if (!lista.length) { S.exportando = false; render(); return; }
       // colunas novas (12/11/2026): preenchidas só para faturadas a partir do corte
-      var headers = ['Chassi', 'Ligação do chassi', 'Nome do cliente', 'Modelo', 'Loja', 'Vendedor', 'Banco/financeira', 'Valor financiado', 'Data de inclusão',
+      var headers = ['Chassi', 'Ligação do chassi', 'Nome do cliente', 'Modelo', 'Loja', 'Vendedor', 'Banco/financeira', 'Valor financiado', 'Total financiado (com tarifas)', 'Data de inclusão',
                      'Data de faturamento', 'Situação', 'Dias úteis em aberto', 'Faixa', 'Nº da proposta',
                      'Data do crédito', 'Conta (loja)', 'Valor creditado', 'Diferença', 'Motivo', 'Valor do rebate', 'Completar dados'];
       var linhas = lista.map(function (r) {
         var p = r.pagamento, paga = ehPaga(r);
         return [chassiDe(r), ligado(r) ? (ORIGEM[r.ligacao_origem] || r.ligacao_origem) : 'Sem ligação', r.cliente || '', seLigado(r, r.modelo), loja(r.loja), vendedorDe(r), r.banco || '',
-                Number(r.financiado) || 0, H.excelDateValue(r.inclusao) || '', H.excelDateValue(r.faturamento) || '', paga ? 'Paga' : 'Em aberto',
+                Number(r.financiado) || 0, Number(r.financiado_base03 != null ? r.financiado_base03 : r.financiado) || 0, H.excelDateValue(r.inclusao) || '', H.excelDateValue(r.faturamento) || '', paga ? 'Paga' : 'Em aberto',
                 paga ? '' : (Number(r.dias) || 0), paga ? '' : (FAIXA_LABEL[r.faixa] || r.faixa), r.proposta || '',
                 p ? (H.excelDateValue(p.data_credito) || '') : '', p ? loja(p.conta_loja) + (p.outra_loja ? ' (outra loja)' : '') : '',
                 p ? Number(p.valor_creditado) : '', p ? Number(p.diferenca || 0) : '', p && p.motivo ? p.motivo : '',
@@ -877,7 +885,7 @@
       });
       var nome = ePagas ? 'Faturamentos pagos' : 'Faturamentos em aberto';
       H.downloadWorkbook(headers, linhas, nome, nome.replace(/ /g, '_') + '_' + H.excelFileStamp() + '.xlsx', {
-        moneyCols: new Set(['Valor financiado', 'Valor creditado', 'Diferença', 'Valor do rebate']), pctCols: new Set(),
+        moneyCols: new Set(['Valor financiado', 'Total financiado (com tarifas)', 'Valor creditado', 'Diferença', 'Valor do rebate']), pctCols: new Set(),
         dateCols: new Set(['Data de inclusão', 'Data de faturamento', 'Data do crédito']),
         intCols: new Set(['Dias úteis em aberto']),
         textCols: new Set(['Chassi', 'Ligação do chassi', 'Nome do cliente', 'Modelo', 'Loja', 'Vendedor', 'Banco/financeira', 'Situação', 'Faixa', 'Nº da proposta',
