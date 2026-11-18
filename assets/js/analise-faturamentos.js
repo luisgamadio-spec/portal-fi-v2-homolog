@@ -238,8 +238,7 @@
       (c.desatualizada ? ' · há ' + esc(c.dias_uteis_desde) + ' dias úteis' : '') + '</span>' : '';
     return '<header class="fatTopo">' +
       '<div class="fatTopoTexto"><p class="modEyebrow">Master, Analistas e Financeiro</p><h1 class="modTitle">Análise de Faturamentos</h1>' +
-      '<p class="modSubtitle">Propostas de financiamento faturadas e ainda sem pagamento do banco para a loja' +
-      (S.dados && S.dados.corte ? ' e, desde ' + esc(corteTxt()) + ', as pagas com os dados do crédito' : '') + '.</p></div>' +
+      '<p class="modSubtitle">Propostas de financiamento faturadas, até o pagamento do banco à loja.</p></div>' +
       '<div class="fatTopoAcoes">' + selo +
       (exp ? '<button type="button" class="modBtn modBtnPrimary fatExportar" data-acao="exportar"' + (n && !S.exportando ? '' : ' disabled') + '>' + (S.exportando ? 'Exportando…' : 'Exportar Excel') + '</button>' : '') +
       '</div></header>' +
@@ -263,16 +262,25 @@
       '<button type="button" class="fatLink" data-acao="periodo" data-v="tudo">ver todas</button></p>';
     return h;
   }
-  // abas: Em aberto | Pagas desde o corte (com quantas faltam completar)
+  // 18/11/2026 (Luis): seletor FATURADOS | PAGOS no estilo do "Faturadas em" (antes, abas "Em aberto | Pagas desde …").
+  // O corte e o "a completar" ficam numa linha de apoio, só na visão PAGOS.
   function abasHtml() {
-    var ab = (S.dados && S.dados.abertas) || [], pg = pagas();
-    var faltaAb = ab.filter(aCompletar).length, faltaPg = pg.filter(aCompletar).length;
-    function aba(v, rot, n, faltam) {
-      return '<button type="button" role="tab" class="fatAba' + (S.aba === v ? ' ativa' : '') + '" data-acao="aba" data-v="' + v + '" aria-selected="' + (S.aba === v) + '">' +
-        rot + ' <span class="fatAbaQtd">' + n + '</span>' + (faltam ? '<span class="fatAbaFalta">' + faltam + ' a completar</span>' : '') + '</button>';
+    var ab = (S.dados && S.dados.abertas) || [], pg = pagas(), faltaPg = pg.filter(aCompletar).length;
+    function bt(v, rot, n) {
+      var on = S.aba === v;
+      return '<button type="button" class="modSegItem fatVisaoBtn' + (on ? ' modSegItemActive' : '') + '" data-acao="aba" data-v="' + v + '" aria-pressed="' + on + '">' +
+        '<span>' + rot + '</span><span class="fatVisaoQtd">' + num(n) + '</span></button>';
     }
-    return '<nav class="fatAbas" role="tablist" aria-label="Propostas">' + aba('abertas', 'Em aberto', ab.length, faltaAb) +
-      aba('pagas', 'Pagas desde ' + esc(corteTxt()), pg.length, faltaPg) + '</nav>';
+    var h = '<section class="fatPeriodo fatVisao" aria-label="Propostas faturadas ou pagas">' +
+      '<span class="fatRotulo">Propostas</span><div class="modSegmentedGroup fatVisaoSeg" role="group" aria-label="Propostas">' +
+      bt('abertas', 'Faturados', ab.length) + bt('pagas', 'Pagos', pg.length) + '</div></section>';
+    if (S.aba === 'pagas') {
+      var so = S.filtros.sit === 'COMPLETAR';
+      h += '<p class="fatApoio"><span>Pagos de propostas faturadas a partir de <b>' + esc(corteTxt()) + '</b>.</span>' +
+        (faltaPg ? '<span class="fatApoioFalta"><i aria-hidden="true"></i>' + num(faltaPg) + ' a completar' +
+          '<button type="button" class="fatLink" data-acao="sit" data-v="COMPLETAR" aria-pressed="' + so + '">' + (so ? 'ver todos' : 'ver só os que faltam') + '</button></span>' : '') + '</p>';
+    }
+    return h;
   }
   var SITUACOES = [{ v: 'COMPLETAR', label: 'Completar dados' }, { v: 'PREENCHIDAS', label: 'Com dados preenchidos' }, { v: 'OUTRA', label: 'Pago na conta de outra loja' }];
   function pagasFiltradas() {
@@ -305,7 +313,7 @@
     l.forEach(function (r) { if (r.pagamento) { cred += Number(r.pagamento.valor_creditado || 0); nCred++; } });
     var faltam = l.filter(aCompletar).length, outras = l.filter(outraLoja).length;
     return '<section class="fatResumo fatResumoPagas">' +
-      '<div class="fatAberto"><p class="fatRotulo">Pagas</p><p class="fatAbertoQtd">' + num(l.length) + '</p>' +
+      '<div class="fatAberto"><p class="fatRotulo">Pagos</p><p class="fatAbertoQtd">' + num(l.length) + '</p>' +
       '<p class="fatAbertoValor">' + esc(brl(soma(l))) + ' <span>financiados</span></p></div>' +
       '<div class="fatPagNums">' +
       '<button type="button" class="fatPagNum' + (S.filtros.sit === 'COMPLETAR' ? ' ativa' : '') + '" data-acao="sit" data-v="COMPLETAR"><b>' + num(faltam) + '</b><span>completar dados</span></button>' +
@@ -352,7 +360,7 @@
     var lista = pagasFiltradas().slice().sort(function (a, b) {
       return (aCompletar(b) ? 1 : 0) - (aCompletar(a) ? 1 : 0) || String(b.faturamento).localeCompare(String(a.faturamento));
     });
-    var tit = S.filtros.sit === 'COMPLETAR' ? 'Pagas — completar dados' : 'Pagas desde ' + esc(corteTxt());
+    var tit = S.filtros.sit === 'COMPLETAR' ? 'Pagos — completar dados' : 'Pagos';
     var h = '<section class="fatLista"><h2 class="modSectionTitle">' + tit + ' <span class="modMuted">(' + lista.length + ')</span></h2>';
     if (!lista.length) return h + '<div class="modEmptyState">' + (S.filtros.sit === 'COMPLETAR' ? 'Nenhuma proposta paga com dados a completar.' : 'Nenhuma proposta paga com esses filtros.') + '</div></section>';
     h += '<div class="fatGrupo fatPagas"><div class="fatTabela"><table class="fatTab fatTabPagas"><colgroup><col class="pChassi"><col class="pLoja"><col class="pBanco">' +
@@ -427,7 +435,7 @@
         '<span class="fatLegDias">' + esc(info[f].dias) + '</span></button>';
     }).join('') + '</div>';
     return '<section class="fatResumo">' +
-      '<div class="fatAberto"><p class="fatRotulo">Em aberto</p><p class="fatAbertoQtd">' + num(l.length) + '</p>' +
+      '<div class="fatAberto"><p class="fatRotulo">Faturados</p><p class="fatAbertoQtd">' + num(l.length) + '</p>' +
       '<p class="fatAbertoValor">' + esc(brl(total)) + ' <span>financiados</span></p>' +
       '<p class="fatAbertoMedia">Média de <b>' + (media == null ? '—' : num(media, 1)) + '</b> dias úteis em aberto</p></div>' +
       '<div class="fatFaixas"><p class="fatRotulo">Por faixa' + (fx ? ' <button type="button" class="fatLink" data-acao="faixa" data-v="' + fx + '">mostrar todas</button>' : ' <span class="fatDica">clique numa faixa para filtrar</span>') + '</p>' +
@@ -470,7 +478,7 @@
   }
   function listaHtml() {
     var lista = ordenar(filtradas());
-    var h = '<section class="fatLista"><h2 class="modSectionTitle">Propostas em aberto <span class="modMuted">(' + lista.length + ')</span></h2>';
+    var h = '<section class="fatLista"><h2 class="modSectionTitle">Faturados <span class="modMuted">(' + lista.length + ')</span></h2>';
     if (!lista.length) return h + '<div class="modEmptyState">Nenhuma proposta faturada em aberto com esses filtros.</div></section>';
     FAIXAS.forEach(function (x) {
       var g = lista.filter(function (r) { return r.faixa === x.v; });
