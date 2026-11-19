@@ -897,6 +897,11 @@
     var key = vm.cellKey(moduleId, col.perfil, col.departamento);
     var checked = acessosState.localPermissions[key] ? ' checked' : '';
     var label = vm.moduleLabel(moduleId) + ' — ' + vm.columnLabel(col.perfil, col.departamento);
+    // 19/11/2026: célula travada (Financeiro fora dos Coparticipados) -- sempre desmarcada e sem edição
+    if (vm.cellLocked && vm.cellLocked(moduleId, col)) {
+      return '<input type="checkbox" class="mamCell mamCellLocked" disabled data-locked="1" title="' + esc(vm.TRAVADA_TXT) + '"' +
+        ' aria-label="' + esc(label + ' — ' + vm.TRAVADA_TXT) + '"' + (acessosState.localPermissions[key] ? ' checked' : '') + '>';
+    }
     return '<input type="checkbox" class="mamCell" data-module="' + esc(moduleId) +
       '" data-perfil="' + esc(col.perfil) + '" data-departamento="' + esc(col.departamento) +
       '" aria-label="' + esc(label) + '"' + checked + (acessosState.saving ? ' disabled' : '') + '>';
@@ -923,7 +928,9 @@
     var vm = window.NX_MASTER_ACESSOS_VIEW_MODEL;
     var cards = acessosState.modules.map(function (m) {
       var scopes = vm.COLUMNS.map(function (c) {
-        return '<label class="mamMobileScopeRow">' + acessosCheckbox(m.id, c) + '<span>' + esc(vm.columnLabel(c.perfil, c.departamento)) + '</span></label>';
+        var trav = vm.cellLocked && vm.cellLocked(m.id, c);
+        return '<label class="mamMobileScopeRow' + (trav ? ' mamMobileLocked' : '') + '">' + acessosCheckbox(m.id, c) + '<span>' + esc(vm.columnLabel(c.perfil, c.departamento)) +
+          (trav ? ' <small>🔒 bloqueado</small>' : '') + '</span></label>';
       }).join('');
       return '<div class="mamMobileCard"><div class="mamMobileCardHead"><span class="mamModuleLabel">' + esc(vm.moduleLabel(m.id)) + '</span>' +
         availBadgeHtml(vm.availabilityFor(m.id)) + '</div>' + scopes + '</div>';
@@ -950,6 +957,8 @@
     }
     html += '<p class="modSubtitle">Defina quais módulos ficam disponíveis para cada perfil. Alterações de acesso não modificam o escopo de dados permitido dentro de cada módulo.</p>';
     html += '<div class="mamMasterNotice">🔒 <b>MASTER</b> possui acesso permanente aos módulos configuráveis e não pode ser restringido por esta configuração.</div>';
+    html += '<div class="mamMasterNotice mamFinNotice">🔒 <b>FINANCEIRO</b>: só "Coparticipados / Subsidiados" (consulta e exportação) pode ser ligado ou desligado aqui; os demais módulos ficam bloqueados no servidor. ' +
+      'A Análise de Faturamentos não faz parte desta matriz (regra fixa: Master, Analistas e Financeiro) e a Brabus IA não é liberada para o Financeiro.</div>';
     if (acessosState.dirty) {
       html += '<div class="mamDirtyBanner">Alterações não salvas — o banco de dados continua com os valores originais.</div>';
     }

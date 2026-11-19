@@ -834,3 +834,9 @@ col.absColStatus { width: 86px; }    /* badge content ~62px + cell padding, view
 .gsPfPjFalta li { margin: 2px 0; }
 .gsPfPjOk { color: var(--color-success, #1b7f4b); }
 .gsPjRow b { font-weight: 600; }
+
+/* 19/11/2026: FINANCEIRO na matriz de acessos -- células travadas no servidor (só Coparticipados é gerenciável) */
+.mamCellLocked { opacity: .3; cursor: not-allowed; }
+.mamFinNotice { margin-top: 8px; }
+.mamMobileLocked { opacity: .6; }
+.mamMobileLocked small { font-size: 0.6875rem; color: var(--mod-muted); }

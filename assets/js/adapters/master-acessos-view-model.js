@@ -70,8 +70,12 @@
     { perfil: 'ANALISTA', departamento: 'TODOS', label: 'Analista', sub: '' },
     { perfil: 'RH', departamento: 'TODOS', label: 'RH', sub: '' },
     { perfil: 'DIRETOR_NOVOS', departamento: 'TODOS', label: 'Diretor', sub: 'Novos' },
-    { perfil: 'DIRETOR_SEMINOVOS', departamento: 'TODOS', label: 'Diretor', sub: 'Seminovos' }
+    { perfil: 'DIRETOR_SEMINOVOS', departamento: 'TODOS', label: 'Diretor', sub: 'Seminovos' },
+    // 19/11/2026 (OK do Luis): FINANCEIRO. Só "Coparticipados / Subsidiados" é gerenciável; as outras células
+    // ficam travadas -- o servidor recusa salvá-las e nunca dá esses módulos ao Financeiro, mesmo marcados.
+    { perfil: 'FINANCEIRO', departamento: 'TODOS', label: 'Financeiro', sub: '', gerenciaveis: ['coparticipadoPortal'] }
   ];
+  var TRAVADA_TXT = 'Bloqueado no servidor para o Financeiro';
 
   function cellKey(moduloId, perfil, departamento) {
     return moduloId + '|' + perfil + '|' + departamento;
@@ -81,6 +85,11 @@
     var col = COLUMNS.filter(function (c) { return c.perfil === perfil && c.departamento === departamento; })[0];
     if (!col) return perfil + ' — ' + departamento;
     return col.sub ? (col.label + ' — ' + col.sub) : col.label;
+  }
+
+  // célula travada: a coluna limita os módulos gerenciáveis e este módulo não está entre eles
+  function cellLocked(moduloId, col) {
+    return !!(col && col.gerenciaveis && col.gerenciaveis.indexOf(moduloId) < 0);
   }
 
   function moduleLabel(moduloId) {
@@ -189,6 +198,8 @@
     MODULE_LABELS: MODULE_LABELS,
     COLUMNS: COLUMNS,
     cellKey: cellKey,
+    cellLocked: cellLocked,
+    TRAVADA_TXT: TRAVADA_TXT,
     columnLabel: columnLabel,
     moduleLabel: moduleLabel,
     availabilityFor: availabilityFor,
