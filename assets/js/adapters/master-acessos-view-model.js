@@ -77,6 +77,15 @@
   ];
   var TRAVADA_TXT = 'Bloqueado no servidor para o Financeiro';
 
+  // 23/11/2026 (pedido do Luis): linhas SÓ DE LEITURA para módulos com regra fixa no servidor (fora da matriz).
+  // Mostram o acesso real; não entram em localPermissions nem no salvamento -- a regra continua no servidor.
+  // Análise de Faturamentos: auth-core FATURAMENTOS + banco _fat_perfil2 = Master, Analista e Financeiro.
+  var FIXED_ROWS = [
+    { id: 'analiseFaturamentos', label: 'Análise de Faturamentos', tag: 'regra fixa',
+      acesso: { 'ANALISTA|TODOS': true, 'FINANCEIRO|TODOS': true } }
+  ];
+  function fixedAllowed(row, col) { return !!(row.acesso && row.acesso[col.perfil + '|' + col.departamento]); }
+
   function cellKey(moduloId, perfil, departamento) {
     return moduloId + '|' + perfil + '|' + departamento;
   }
@@ -199,6 +208,8 @@
     COLUMNS: COLUMNS,
     cellKey: cellKey,
     cellLocked: cellLocked,
+    FIXED_ROWS: FIXED_ROWS,
+    fixedAllowed: fixedAllowed,
     TRAVADA_TXT: TRAVADA_TXT,
     columnLabel: columnLabel,
     moduleLabel: moduleLabel,
