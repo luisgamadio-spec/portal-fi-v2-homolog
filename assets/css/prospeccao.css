@@ -95,6 +95,11 @@
 .pspDetAcoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pspAtribuir { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--color-text-secondary, #c9c9cf); min-width: 0; }
 .pspAtribuir select { height: 32px; border-radius: 8px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: inherit; font-size: 13px; max-width: 220px; min-width: 0; }
+/* 23/11: listas abertas legíveis em qualquer navegador — o fundo translúcido deixava as opções em fundo BRANCO com texto claro.
+   Fundo sólido do tema + color-scheme escuro (Chrome/Edge/Safari desenham a lista escura) + cores explícitas nas opções. */
+.pspPagina select, .pspBarraSel select, .pspModal select { background-color: var(--mod-surface-elevated, #1c1c21); color: var(--color-text-primary, #f2f2f2); color-scheme: dark; }
+.pspPagina select option, .pspBarraSel select option, .pspModal select option { background-color: var(--mod-surface-elevated, #1c1c21); color: var(--color-text-primary, #f2f2f2); }
+.pspPagina select option:checked, .pspBarraSel select option:checked, .pspModal select option:checked { background-color: #3a3a44; color: #ffffff; font-weight: 700; }
 
 /* ---- rodapé: mais, mensagens, estados */
 .pspMais { display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin: 14px 0 4px; font-size: 13px; color: var(--color-text-muted, #9a9aa2); }

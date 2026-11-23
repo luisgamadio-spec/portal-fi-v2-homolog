@@ -59,7 +59,21 @@
   function num(v) { return Number(v || 0).toLocaleString('pt-BR'); }
   function dt(iso) { if (!iso) return '—'; var p = String(iso).slice(0, 10).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
   function mesAno(iso) { if (!iso) return ''; var p = String(iso).slice(0, 10).split('-'); return MESES[Number(p[1]) - 1] + '/' + p[0]; }
-  function loja(code) { return code ? (window.NX_STORE_DISPLAY ? window.NX_STORE_DISPLAY.storeDisplayName(code) : code) : '—'; }
+  function loja(code) {
+    if (!code) return '—';
+    if (code === 'SUZUKI GASTAO') return 'Suzuki Gastão';   // loja própria da Prospecção (não está no cadastro de lojas do Portal)
+    return window.NX_STORE_DISPLAY ? window.NX_STORE_DISPLAY.storeDisplayName(code) : code;
+  }
+  // nome de pessoa só para EXIBIÇÃO: "AGATHA RODRIGUES" → "Agatha Rodrigues"; da/de/do/das/dos/e em minúsculas.
+  // Mantém os acentos que vierem (o nome do cadastro do Portal já vem com a grafia certa). O banco não muda.
+  var PARTICULAS = { da: 1, de: 1, do: 1, das: 1, dos: 1, e: 1 };
+  function nomeP(n) {
+    if (!n) return n;
+    return String(n).trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR').split(' ').map(function (w, i) {
+      if (i > 0 && PARTICULAS[w]) return w;
+      return w.split('-').map(function (x) { return x.charAt(0).toLocaleUpperCase('pt-BR') + x.slice(1); }).join('-');
+    }).join(' ');
+  }
   function parseISO(iso) { var p = String(iso).slice(0, 10).split('-'); return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); }
   function addMeses(d, n) { var x = new Date(d.getFullYear(), d.getMonth() + n, 1); var ult = new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate(); x.setDate(Math.min(d.getDate(), ult)); return x; }
   function hoje() { var h = new Date(); return new Date(h.getFullYear(), h.getMonth(), h.getDate()); }
@@ -155,7 +169,7 @@
         '<option value="A_DISTRIBUIR"' + (f.vendedor === 'A_DISTRIBUIR' ? ' selected' : '') + '>A distribuir (sem vendedor ou saiu)</option>' +
         '<option value="SEM_VENDEDOR"' + (f.vendedor === 'SEM_VENDEDOR' ? ' selected' : '') + '>· só sem vendedor</option>' +
         '<option value="VENDEDOR_SAIU"' + (f.vendedor === 'VENDEDOR_SAIU' ? ' selected' : '') + '>· só vendedor saiu</option>' +
-        (fl.vendedores || []).map(function (v) { return '<option value="' + esc(v.id) + '"' + (f.vendedor === v.id ? ' selected' : '') + '>' + esc(v.nome) + '</option>'; }).join('') + '</select>';
+        (fl.vendedores || []).slice().sort(function (a, b) { return nomeP(a.nome).localeCompare(nomeP(b.nome), 'pt-BR'); }).map(function (v) { return '<option value="' + esc(v.id) + '"' + (f.vendedor === v.id ? ' selected' : '') + '>' + esc(nomeP(v.nome)) + '</option>'; }).join('') + '</select>';
     }
     h += '<label class="pspCheck"><input type="checkbox" data-campo="ocultarNovo"' + (f.ocultarNovo ? ' checked' : '') + '> Ocultar quem já fez novo contrato</label></div></div>';
     return h;
@@ -166,10 +180,10 @@
   }
   function vendedorHtml(r) {
     if (!r.vendedor) return '<span class="pspSemVend">Sem vendedor</span>';
-    if (r.vendedor_saiu) return '<div class="pspNome2">' + esc(r.vendedor) + '</div><span class="pspTag amb">vendedor saiu</span>';
+    if (r.vendedor_saiu) return '<div class="pspNome2">' + esc(nomeP(r.vendedor)) + '</div><span class="pspTag amb">vendedor saiu</span>';
     var origem = r.vendedor_origem !== 'ATRIBUICAO' ? 'da venda original'
-      : (r.vendedor_original ? 'venda original: ' + esc(r.vendedor_original) : 'atribuído' + (r.atribuido_por ? ' por ' + esc(primeiro(r.atribuido_por)) : ''));
-    return '<div class="pspNome2">' + esc(r.vendedor) + '</div><div class="pspMini">' + origem + '</div>';
+      : (r.vendedor_original ? 'venda original: ' + esc(nomeP(r.vendedor_original)) : 'atribuído' + (r.atribuido_por ? ' por ' + esc(primeiro(r.atribuido_por)) : ''));
+    return '<div class="pspNome2">' + esc(nomeP(r.vendedor)) + '</div><div class="pspMini">' + origem + '</div>';
   }
   function primeiro(n) { return String(n || '').split(' ')[0].replace(/^./, function (c) { return c.toUpperCase(); }).replace(/^(.)(.*)$/, function (m, a, b) { return a + b.toLowerCase(); }); }
   function parcelaFinal(r) {
@@ -252,7 +266,7 @@
     if (g) {
       h += '<div class="pspDetAcoes">';
       h += '<label class="pspAtribuir"><span>' + (r.vendedor_id ? 'Trocar vendedor' : 'Atribuir a') + '</span><select data-campo="atribuirUm" data-op="' + esc(r.op_codigo) + '"><option value="">' +
-        (d.vendedores ? 'Escolha…' : 'Carregando…') + '</option>' + (d.vendedores || []).map(function (x) { return '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>'; }).join('') + '</select></label>' +
+        (d.vendedores ? 'Escolha…' : 'Carregando…') + '</option>' + (d.vendedores || []).map(function (x) { return '<option value="' + esc(x.id) + '">' + esc(nomeP(x.nome)) + '</option>'; }).join('') + '</select></label>' +
         '<button type="button" class="modBtn modBtnPrimary modBtnSm" data-acao="atribuir-um" data-op="' + esc(r.op_codigo) + '">' + (r.vendedor_id ? 'Trocar' : 'Atribuir') + '</button>';
       if (r.vendedor_origem === 'ATRIBUICAO') h += '<button type="button" class="modBtn modBtnSecondary modBtnSm" data-acao="tirar-um" data-op="' + esc(r.op_codigo) + '">Tirar atribuição</button>';
       if (S.dados.pode_nao_contatar) h += '<button type="button" class="modBtn modBtnSecondary modBtnSm" data-acao="nao-contatar" data-op="' + esc(r.op_codigo) + '" data-v="' + (r.nao_contatar ? '0' : '1') + '">' + (r.nao_contatar ? 'Voltar a contatar' : 'Marcar não contatar') + '</button>';
@@ -287,7 +301,7 @@
     var b = S.barra || {};
     return '<div class="pspBarraSel" role="region" aria-label="Ações para os selecionados"><b>' + num(ops.length) + (ops.length === 1 ? ' selecionado' : ' selecionados') + '</b>' +
       '<label class="pspAtribuir"><span>Atribuir a</span><select data-campo="atribuirLote" aria-label="Vendedor"><option value="">' + (b.carregando ? 'Carregando…' : (b.erro ? esc(b.erro) : 'Escolha um vendedor…')) + '</option>' +
-      (b.vendedores || []).map(function (x) { return '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>'; }).join('') + '</select></label>' +
+      (b.vendedores || []).map(function (x) { return '<option value="' + esc(x.id) + '">' + esc(nomeP(x.nome)) + '</option>'; }).join('') + '</select></label>' +
       '<button type="button" class="modBtn modBtnPrimary modBtnSm" data-acao="atribuir-lote">Atribuir</button>' +
       '<button type="button" class="modBtn modBtnSecondary modBtnSm" data-acao="tirar-lote">Tirar atribuição</button>' +
       '<button type="button" class="pspLinkSec" data-acao="limpar-sel">Limpar seleção</button></div>';
@@ -306,7 +320,7 @@
       (m.vendedores || []).forEach(function (v) { (porLoja[v.loja] = porLoja[v.loja] || []).push(v); });
       Object.keys(porLoja).sort().forEach(function (l) {
         h += '<fieldset class="pspDivLoja"><legend>' + esc(loja(l)) + '</legend>' + porLoja[l].map(function (v) {
-          return '<label class="pspCheck"><input type="checkbox" data-acao="div-vend" data-id="' + esc(v.id) + '"' + (m.marcados[v.id] ? ' checked' : '') + '> ' + esc(v.nome) + '</label>';
+          return '<label class="pspCheck"><input type="checkbox" data-acao="div-vend" data-id="' + esc(v.id) + '"' + (m.marcados[v.id] ? ' checked' : '') + '> ' + esc(nomeP(v.nome)) + '</label>';
         }).join('') + '</fieldset>';
       });
       h += '<p class="pspDivConta">' + (marcados ? 'Cerca de <b>' + num(Math.ceil(sem / marcados)) + '</b> para cada um dos ' + num(marcados) + ' vendedores.' : 'Escolha os vendedores que vão receber.') + '</p>';
@@ -369,7 +383,7 @@
       var conta = {}, nomes = {};
       listas.forEach(function (lst) { (lst || []).forEach(function (v) { conta[v.id] = (conta[v.id] || 0) + 1; nomes[v.id] = v.nome; }); });
       S.barra = { vendedores: Object.keys(conta).filter(function (id) { return conta[id] === listas.length; }).map(function (id) { return { id: id, nome: nomes[id] }; })
-        .sort(function (a, b) { return a.nome.localeCompare(b.nome); }) };
+        .sort(function (a, b) { return nomeP(a.nome).localeCompare(nomeP(b.nome), 'pt-BR'); }) };
       render();
     }).catch(function (e) { S.barra = { erro: (e && e.message) || 'erro ao carregar' }; render(); });
   }
@@ -388,7 +402,7 @@
   }
   function confirmarTrocaHtml() {
     var m = S.confirmarTroca; if (!m) return '';
-    var donos = {}; m.lista.forEach(function (x) { donos[x.dono || 'vendedor'] = (donos[x.dono || 'vendedor'] || 0) + 1; });
+    var donos = {}; m.lista.forEach(function (x) { var k = nomeP(x.dono) || 'vendedor'; donos[k] = (donos[k] || 0) + 1; });
     var nomes = Object.keys(donos).map(function (n) { return esc(n) + (donos[n] > 1 ? ' (' + num(donos[n]) + ')' : ''); }).join(', ');
     return '<div class="pspModalFundo" data-acao="cancelar-troca"></div><div class="pspModal" role="alertdialog" aria-modal="true" aria-labelledby="pspTrocaTit">' +
       '<h3 id="pspTrocaTit">' + (m.lista.length === 1 ? 'Este cliente é de um vendedor ativo' : 'Estes clientes são de vendedores ativos') + '</h3>' +
@@ -419,7 +433,7 @@
     rpc('prospeccao_dividir', { p_tipo: null, p_faixa: f.faixa, p_loja: f.loja || null, p_banco: null, p_busca: f.busca || null, p_ocultar_novo: !!f.ocultarNovo, p_vendedores: ids, p_departamento: f.departamento || null })
       .then(function (r) {
         m.enviando = false;
-        var nomes = {}; (m.vendedores || []).forEach(function (v) { nomes[v.id] = v.nome; });
+        var nomes = {}; (m.vendedores || []).forEach(function (v) { nomes[v.id] = nomeP(v.nome); });
         var partes = Object.keys(r.por_vendedor || {}).map(function (id) { return num(r.por_vendedor[id]) + ' para ' + (nomes[id] || 'vendedor'); });
         var fora = [];
         if (r.sem_vendedor_apto_na_loja) fora.push(num(r.sem_vendedor_apto_na_loja) + ' sem vendedor escolhido da mesma loja e departamento');
@@ -437,8 +451,8 @@
       var linhas = ((d && d.lista) || []).map(function (r) {
         return [r.cliente || '', loja(r.loja), TIPO_LABEL[r.tipo] || r.tipo, r.banco || '', Number(r.parcelas) || 0, Number(r.valor_parcela) || 0,
                 H.excelDateValue(r.data_contrato) || '', H.excelDateValue(r.data_fim) || '', r.balao_valor != null ? Number(r.balao_valor) : '',
-                r.vendedor || 'Sem vendedor', r.vendedor_origem === 'ATRIBUICAO' ? 'Atribuído' : (r.vendedor_origem === 'VENDA' ? (r.vendedor_saiu ? 'Venda original · vendedor saiu' : 'Venda original') : ''),
-                r.vendedor_original || '',
+                nomeP(r.vendedor) || 'Sem vendedor', r.vendedor_origem === 'ATRIBUICAO' ? 'Atribuído' : (r.vendedor_origem === 'VENDA' ? (r.vendedor_saiu ? 'Venda original · vendedor saiu' : 'Venda original') : ''),
+                nomeP(r.vendedor_original) || '',
                 r.pj ? 'Sim' : '', r.ja_fez_novo ? 'Sim' : '', r.nao_contatar ? 'Sim' : ''];
       });
       var cab = ['Cliente', 'Loja', 'Tipo', 'Banco', 'Parcelas', 'Parcela', 'Contrato', 'Termina', 'Parcela final', 'Vendedor', 'Origem do vendedor', 'Vendedor da venda original', 'PJ', 'Já fez novo contrato', 'Não contatar'];
