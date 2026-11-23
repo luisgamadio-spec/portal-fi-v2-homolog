@@ -322,6 +322,19 @@
 .fatPagBtn:focus-visible, .fatRebBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 .fatColAcao .fatPagBtn, .fatColAcao .fatRebBtn { margin-right: 6px; }
 .fatTab .fatColAcao .fatPagBtn, .fatTab .fatColAcao .fatRebBtn { padding: 6px 9px; }
+/* 23/11/2026: dado já informado = indicador de estado (não é botão); edição discreta "Editar" no "+ detalhes" */
+.fatEstado { display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; font-weight: 500; color: var(--color-text-secondary);
+  padding: 4px 0; margin-right: 10px; white-space: nowrap; cursor: default; vertical-align: middle; }
+.fatEstadoIco { width: 13px; height: 13px; flex: none; color: color-mix(in srgb, var(--fat-normal) 80%, var(--color-text-secondary)); }
+.fatEstadoDif { color: var(--fat-atencao); }
+.fatEstadoDif .fatEstadoIco { color: var(--fat-atencao); }
+.fatColAcao .fatEstado { display: flex; justify-content: flex-end; margin: 0 0 2px; }
+.fatCartaoAcoes { align-items: center; }
+.fatCartaoAcoes .fatEstado { flex: 1 1 auto; margin-right: 0; white-space: normal; }
+.fatEditar { background: none; border: 0; padding: 4px 2px; font: inherit; font-size: 0.8125rem; font-weight: 500; color: var(--color-text-secondary);
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); cursor: pointer; }
+.fatEditar:hover { color: var(--color-text-primary); }
+.fatEditar:focus-visible { outline: var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
 .fatPagBtnForte { background: var(--fat-normal); color: #04140a; border-color: var(--fat-normal); }
 .fatRebBtnForte { background: #c9a0ff; color: #170a2b; border-color: #c9a0ff; }
 .fatResumoPagas { grid-template-columns: minmax(180px, 240px) 1fr; }

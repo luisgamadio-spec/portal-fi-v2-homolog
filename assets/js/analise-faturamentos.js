@@ -199,13 +199,31 @@
     return outraLoja(r) ? '<span class="fatOutraLoja">Pago na conta de outra loja: ' + esc(loja(r.pagamento.conta_loja)) + '</span>' : '';
   }
   function seloSubs(r) { return r && r.subsidiado ? '<span class="fatSubs" title="Plano 999 (Subsidiado)">Subsidiada</span>' : ''; }
+  // 23/11/2026 (pedido dos analistas): com o dado já informado, a linha mostra só um INDICADOR de estado (não é botão);
+  // a edição fica no "+ detalhes", como ação discreta "Editar". O botão continua só quando o dado falta.
   function botaoPag(r, cls) {
-    if (!ehPaga(r) || !r.pode_preencher) return '';
-    return '<button type="button" class="fatPagBtn' + (cls ? ' ' + cls : '') + '" data-acao="pagar" data-id="' + esc(r._k) + '">' + (cls ? (r.pagamento ? 'Corrigir dados do crédito' : 'Preencher dados do crédito') : (r.pagamento ? 'Corrigir crédito' : 'Preencher crédito')) + '</button>';
+    if (!ehPaga(r)) return '';
+    if (r.pagamento) return cls ? '' : estadoPag(r);
+    if (!r.pode_preencher) return '';
+    return '<button type="button" class="fatPagBtn' + (cls ? ' ' + cls : '') + '" data-acao="pagar" data-id="' + esc(r._k) + '">' + (cls ? 'Preencher dados do crédito' : 'Preencher crédito') + '</button>';
   }
   function botaoReb(r, cls) {
-    if (!r.subsidiado || !r.pode_preencher) return '';
-    return '<button type="button" class="fatRebBtn' + (cls ? ' ' + cls : '') + '" data-acao="rebate" data-id="' + esc(r._k) + '">' + (r.rebate ? 'Corrigir rebate' : 'Informar rebate') + '</button>';
+    if (!r.subsidiado) return '';
+    if (r.rebate) return cls ? '' : estadoReb(r);
+    if (!r.pode_preencher) return '';
+    return '<button type="button" class="fatRebBtn' + (cls ? ' ' + cls : '') + '" data-acao="rebate" data-id="' + esc(r._k) + '">Informar rebate</button>';
+  }
+  var CHECK = '<svg class="fatEstadoIco" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function estadoPag(r) {
+    var dif = Number(r.pagamento.diferenca || 0);
+    return '<span class="fatEstado fatEstadoPag' + (dif ? ' fatEstadoDif' : '') + '" title="' + esc('Crédito de ' + brl2(r.pagamento.valor_creditado) + (dif ? ' (diferença de ' + brl2(dif) + ')' : '')) + '">' +
+      CHECK + '<span>Crédito informado' + (dif ? ' · com diferença' : '') + '</span></span>';
+  }
+  function estadoReb(r) {
+    return '<span class="fatEstado fatEstadoReb" title="' + esc('Rebate de ' + brl2(r.rebate.valor)) + '">' + CHECK + '<span>Rebate informado</span></span>';
+  }
+  function editarLink(r, acao, rotulo) {
+    return r.pode_preencher ? '<button type="button" class="fatEditar" data-acao="' + acao + '" data-id="' + esc(r._k) + '" aria-label="' + esc(rotulo) + '">Editar</button>' : '';
   }
 
   // período escolhido -> datas (De/Até) enviadas ao servidor, sempre pela data de faturamento
@@ -345,7 +363,7 @@
       '<td class="fatNum">' + (p ? esc(data(p.data_credito)) : '<span class="modMuted">—</span>') + '</td>' +
       '<td class="fatCorta">' + (p ? esc(loja(p.conta_loja)) : '<span class="modMuted">—</span>') + '</td>' +
       '<td class="fatNum">' + creditoTxt(r) + '</td>' +
-      '<td class="fatColJust">' + seloCompletar(r) + seloOutraLoja(r) + seloSubs(r) + (r.rebate ? '<span class="fatRebOk">Rebate ' + esc(brl2(r.rebate.valor)) + '</span>' : '') + '</td>' +
+      '<td class="fatColJust">' + seloCompletar(r) + seloOutraLoja(r) + seloSubs(r) + '</td>' +
       '<td class="fatColAcao">' + botaoPag(r) + botaoReb(r) +
       '<button type="button" class="fatMais" data-acao="detalhe" data-id="' + esc(r._k) + '" aria-label="Mais detalhes da proposta ' + esc(chassiDe(r)) + '">+ detalhes</button></td></tr>';
   }
@@ -539,13 +557,13 @@
     });
     (hst.pagamentos || []).forEach(function (p, i, l) {
       var dif = Number(p.diferenca || 0);
-      itens.push({ em: p.em, html: '<li class="fatHistPag"><div class="fatHistCab"><b>' + (i < l.length - 1 ? 'Dados do crédito corrigidos' : 'Dados do crédito preenchidos') + '</b><span>' + esc(dataHora(p.em)) + '</span></div>' +
+      itens.push({ em: p.em, html: '<li class="fatHistPag"><div class="fatHistCab"><b>' + (i < l.length - 1 ? 'Dados do crédito alterados' : 'Dados do crédito preenchidos') + '</b><span>' + esc(dataHora(p.em)) + '</span></div>' +
         '<p class="fatHistTexto">Crédito em ' + esc(dataLonga(p.data_credito)) + ' na conta da loja ' + esc(loja(p.conta_loja)) + ' · ' + esc(brl2(p.valor_creditado)) +
         (dif ? ' (diferença de ' + esc(brl2(dif)) + ': ' + esc(p.motivo || '—') + ')' : '') + (p.outra_loja ? ' · conta de outra loja' : '') + '</p>' +
         '<p class="fatHistAutor">' + esc(titulo(p.por) || '—') + ' · ' + esc(titulo(p.perfil)) + '</p></li>' });
     });
     (hst.rebates || []).forEach(function (b, i, l) {
-      itens.push({ em: b.em, html: '<li class="fatHistReb"><div class="fatHistCab"><b>' + (i < l.length - 1 ? 'Rebate corrigido' : 'Rebate informado') + '</b><span>' + esc(dataHora(b.em)) + '</span></div>' +
+      itens.push({ em: b.em, html: '<li class="fatHistReb"><div class="fatHistCab"><b>' + (i < l.length - 1 ? 'Rebate alterado' : 'Rebate informado') + '</b><span>' + esc(dataHora(b.em)) + '</span></div>' +
         '<p class="fatHistTexto">Valor do rebate: ' + esc(brl2(b.valor)) + '</p><p class="fatHistAutor">' + esc(titulo(b.por) || '—') + ' · ' + esc(titulo(b.perfil)) + '</p></li>' });
     });
     if (!itens.length) return h + '<p class="modMuted">' + (ehPaga(r) ? 'Nenhum registro ainda.' : pedeJust(r) ? 'Nenhuma justificativa ainda.' : 'Propostas na faixa Normal não pedem justificativa.') + '</p></section>';
@@ -560,7 +578,7 @@
     // bloco do pagamento e do rebate (só o que é desde o corte)
     var p = r.pagamento, blocos = '';
     if (ehPaga(r)) {
-      blocos += '<section class="fatDetBloco"><div class="fatHistTopo"><h3 class="fatHistTitulo">Crédito na conta</h3>' + botaoPag(r, 'fatPagBtnForte') + '</div>' +
+      blocos += '<section class="fatDetBloco"><div class="fatHistTopo"><h3 class="fatHistTitulo">Crédito na conta</h3>' + (p ? editarLink(r, 'pagar', 'Editar dados do crédito') : botaoPag(r, 'fatPagBtnForte')) + '</div>' +
         (p ? '<dl class="fatDetLista">' + item('Data do crédito', esc(dataLonga(p.data_credito))) + item('Conta que recebeu (loja)', esc(loja(p.conta_loja))) +
           item('Valor creditado', esc(brl2(p.valor_creditado))) + item('Valor financiado', esc(brl2(p.valor_esperado))) +
           (Number(p.diferenca) ? item('Diferença', esc(brl2(p.diferenca))) + item('Motivo', esc(p.motivo || '—')) : '') +
@@ -568,7 +586,7 @@
           : '<p class="fatDetFalta">' + seloCompletar(r) + ' Faltam a data do crédito, a loja da conta que recebeu e o valor creditado.</p>') + '</section>';
     }
     if (r.subsidiado) {
-      blocos += '<section class="fatDetBloco"><div class="fatHistTopo"><h3 class="fatHistTitulo">Rebate (Subsidiada)</h3>' + botaoReb(r, 'fatRebBtnForte') + '</div>' +
+      blocos += '<section class="fatDetBloco"><div class="fatHistTopo"><h3 class="fatHistTitulo">Rebate (Subsidiada)</h3>' + (r.rebate ? editarLink(r, 'rebate', 'Editar rebate') : botaoReb(r, 'fatRebBtnForte')) + '</div>' +
         (r.rebate ? '<dl class="fatDetLista">' + item('Valor do rebate', esc(brl2(r.rebate.valor))) +
           item('Informado por', esc(titulo(r.rebate.por) || '—') + ' <small>' + esc(dataHora(r.rebate.em)) + '</small>') + '</dl>'
           : '<p class="fatDetFalta">' + seloCompletar(r) + ' Falta o valor do rebate.</p>') + '</section>';
@@ -689,7 +707,7 @@
     var contas = (S.dados && S.dados.contas) || [], d = difPag(F, r), outra = F.conta && F.conta !== r.loja;
     return '<div class="fatVeu" data-acao="cancelar"></div>' +
       '<aside class="fatDetalhe fatForm fatFormPag" role="dialog" aria-modal="true" aria-labelledby="fatPagTitulo">' +
-      '<div class="fatDetTopo"><div><p class="modEyebrow">' + (r.pagamento ? 'Corrigir dados do crédito' : 'Dados do crédito') + '</p><h2 id="fatPagTitulo" class="fatDetTitulo">' + esc(tituloForm(r)) + '</h2>' +
+      '<div class="fatDetTopo"><div><p class="modEyebrow">' + (r.pagamento ? 'Editar dados do crédito' : 'Dados do crédito') + '</p><h2 id="fatPagTitulo" class="fatDetTitulo">' + esc(tituloForm(r)) + '</h2>' +
       '<p class="fatFormSub"><span class="fatMono">' + esc(chassiDe(r)) + '</span> · ' + esc(loja(r.loja)) + ' · ' + esc(r.banco || '—') + ' · financiado ' + finTxt(r) + '</p></div>' +
       '<button type="button" class="fatFechar" data-acao="cancelar" aria-label="Fechar sem salvar">×</button></div>' +
       '<form class="fatFormCorpo fatPagCorpo" novalidate>' +
@@ -706,7 +724,7 @@
       '<div id="fatPagMotivoBox"' + (d ? '' : ' hidden') + '><label class="fatTextoRot" for="fatPagMotivo">Motivo da diferença <span>(obrigatório; mínimo de 5 caracteres)</span></label>' +
       '<textarea id="fatPagMotivo" rows="2" maxlength="300">' + esc(F.motivo || '') + '</textarea></div>' +
       (F.erro ? '<p class="fatErroForm" role="alert">' + esc(F.erro) + '</p>' : '') +
-      '<p class="modMuted fatFormNota">Fica registrado com o seu nome, a data e a hora. ' + (r.pagamento ? 'A versão anterior continua no histórico.' : 'Para corrigir depois, use "Corrigir dados do crédito"; a versão anterior fica no histórico.') + '</p>' +
+      '<p class="modMuted fatFormNota">Fica registrado com o seu nome, a data e a hora. ' + (r.pagamento ? 'A versão anterior continua no histórico.' : 'Para alterar depois, use "Editar" no "+ detalhes"; a versão anterior fica no histórico.') + '</p>' +
       '<div class="fatFormAcoes"><button type="button" class="modBtn modBtnGhost" data-acao="cancelar">Cancelar</button>' +
       '<button type="submit" class="modBtn modBtnPrimary" data-acao="salvarPag"' + (F.salvando ? ' disabled' : '') + '>' + (F.salvando ? 'Salvando…' : 'Salvar dados do crédito') + '</button></div>' +
       '</form></aside>';
@@ -716,14 +734,14 @@
     if (!r) return '';
     return '<div class="fatVeu" data-acao="cancelar"></div>' +
       '<aside class="fatDetalhe fatForm fatFormReb" role="dialog" aria-modal="true" aria-labelledby="fatRebTitulo">' +
-      '<div class="fatDetTopo"><div><p class="modEyebrow">' + (r.rebate ? 'Corrigir rebate' : 'Rebate da Subsidiada') + '</p><h2 id="fatRebTitulo" class="fatDetTitulo">' + esc(tituloForm(r)) + '</h2>' +
+      '<div class="fatDetTopo"><div><p class="modEyebrow">' + (r.rebate ? 'Editar rebate' : 'Rebate da Subsidiada') + '</p><h2 id="fatRebTitulo" class="fatDetTitulo">' + esc(tituloForm(r)) + '</h2>' +
       '<p class="fatFormSub"><span class="fatMono">' + esc(chassiDe(r)) + '</span> · ' + esc(loja(r.loja)) + ' · ' + esc(r.banco || '—') + ' · financiado ' + finTxt(r) + '</p></div>' +
       '<button type="button" class="fatFechar" data-acao="cancelar" aria-label="Fechar sem salvar">×</button></div>' +
       '<form class="fatFormCorpo fatRebCorpo" novalidate>' +
       '<label class="fatTextoRot" for="fatRebValor">Valor do rebate (R$)</label>' +
       '<input id="fatRebValor" class="fatCampo fatNumCampo" inputmode="decimal" autocomplete="off" value="' + esc(F.valor) + '" required>' +
       (F.erro ? '<p class="fatErroForm" role="alert">' + esc(F.erro) + '</p>' : '') +
-      '<p class="modMuted fatFormNota">Proposta Subsidiada (plano 999). Fica registrado com o seu nome, a data e a hora; uma correção não apaga o valor anterior, que continua no histórico.</p>' +
+      '<p class="modMuted fatFormNota">Proposta Subsidiada (plano 999). Fica registrado com o seu nome, a data e a hora; uma alteração não apaga o valor anterior, que continua no histórico.</p>' +
       '<div class="fatFormAcoes"><button type="button" class="modBtn modBtnGhost" data-acao="cancelar">Cancelar</button>' +
       '<button type="submit" class="modBtn modBtnPrimary" data-acao="salvarReb"' + (F.salvando ? ' disabled' : '') + '>' + (F.salvando ? 'Salvando…' : 'Salvar rebate') + '</button></div>' +
       '</form></aside>';
