@@ -15,7 +15,7 @@
 .pspFaixa.urg-alta::before { background: var(--color-accent-primary, #e30613); }
 .pspFaixa.urg-media::before { background: #f0b429; }
 .pspFaixa:hover { border-color: rgba(255,255,255,.22); }
-.pspFaixa:focus-visible, .pspChip:focus-visible, .pspLinha:focus-visible, .pspCartaoAbre:focus-visible, .pspLinkSec:focus-visible {
+.pspFaixa:focus-visible, .pspChaveOp:focus-visible, .pspLinha:focus-visible, .pspCartaoAbre:focus-visible, .pspLinkSec:focus-visible {
   outline: 2px solid var(--color-accent-primary, #e30613); outline-offset: 2px; }
 .pspFaixa.isOn { border-color: var(--color-accent-primary, #e30613); box-shadow: inset 0 0 0 1px var(--color-accent-primary, #e30613); background: rgba(227,6,19,.08); }
 .pspFaixaN { font-size: 26px; font-weight: 700; line-height: 1.1; }
@@ -24,7 +24,6 @@
 .pspFaixa.isZero .pspFaixaN { color: var(--color-text-muted, #9a9aa2); }
 .pspFaixaR { font-size: 12.5px; color: var(--color-text-secondary, #c9c9cf); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .pspCurto { display: none; }
-.pspExtras { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 8px 2px 12px; }
 .pspLinkSec { background: none; border: 0; padding: 4px 0; color: var(--color-text-muted, #9a9aa2); font-size: 12.5px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .pspLinkSec:hover, .pspLinkSec.isOn { color: var(--color-text-primary, #f2f2f2); }
 
@@ -36,9 +35,11 @@
 
 /* ---- filtros: chips de tipo + busca + selects na mesma linha */
 .pspFiltros { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 10px; }
-.pspChips { display: flex; flex-wrap: wrap; gap: 6px; }
-.pspChip { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: transparent; color: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.pspChip.isOn { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.30); }
+.pspFaixas { margin-bottom: 12px; }
+/* chave NOVOS | SEMINOVOS (duas posições, uma sempre ligada) */
+.pspChave { display: inline-flex; padding: 3px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.03); flex: none; }
+.pspChaveOp { height: 30px; min-width: 104px; padding: 0 16px; border-radius: 999px; border: 0; background: transparent; color: var(--color-text-muted, #9a9aa2); font-size: 12.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+.pspChaveOp.isOn { background: rgba(255,255,255,.14); color: var(--color-text-primary, #f2f2f2); box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
 .pspCampos { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: 1 1 420px; min-width: 0; }
 .pspCampos select, .pspBusca { height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.04); color: inherit; padding: 0 10px; font-size: 13px; min-width: 0; }
 .pspBusca { flex: 1 1 200px; }
@@ -127,13 +128,12 @@
   .pspFaixaN { font-size: 18px; }
   .pspFaixaR { font-size: 11px; }
   .pspLongo { display: none; } .pspCurto { display: inline; }
-  .pspExtras { margin: 6px 2px 8px; }
   .pspAviso { padding: 8px 10px; font-size: 12.5px; }
   .pspAviso p { flex-basis: 100%; }
   .pspAvisoAcoes { width: 100%; flex-wrap: nowrap; } .pspAvisoAcoes .modBtn { flex: 1 1 0; min-width: 0; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pspFiltros { gap: 6px; margin-bottom: 8px; }
-  .pspChips { flex-wrap: wrap; max-width: 100%; }
-  .pspChip { flex: none; height: 28px; padding: 0 10px; font-size: 12px; }
+  .pspChave { display: flex; width: 100%; }
+  .pspChaveOp { flex: 1 1 50%; min-width: 0; height: 34px; }
   .pspCampos { flex-basis: 100%; }
   .pspCampos select { flex: 1 1 45%; } .pspBusca { flex-basis: 100%; }
   .pspTabela { display: none; } .pspCartoes { display: block; }

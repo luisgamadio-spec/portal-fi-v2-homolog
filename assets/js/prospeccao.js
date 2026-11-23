@@ -1,6 +1,10 @@
 /* PORTAL-NEXT V2 — Prospecção: clientes com financiamento terminando (23/11/2026, pedido do Luis; layout de UX refeito).
    Pergunta da tela: "quem eu procuro agora?" (todos) e "o que falta distribuir?" (gerente/analista/Master).
-   O tempo é a navegação principal (5 faixas; abre em "Até 30 dias"); tipo, loja, vendedor e busca são filtros.
+   O tempo é a navegação principal (5 faixas; abre em "Até 30 dias"); loja, vendedor e busca são filtros.
+   Chave NOVOS | SEMINOVOS (ajuste de 23/11): filtra lista, faixas, aviso e exportação; abre no departamento do usuário
+   (quem vê os dois abre em Novos); quem tem um só não vê a chave. Vendas Direta conta como Novos (no banco).
+   Vendedor da venda: o nome das bases de vendas aparece mesmo quando a pessoa não é (ou nunca foi) usuária do Portal,
+   com a marca "vendedor saiu"; "a distribuir" = sem nome OU vendedor saiu.
 
    Acesso e recorte: SEMPRE no banco (prospeccao_painel / _detalhes / _revelar_documento / _atribuir / _dividir /
    _nao_contatar / _exportar / _vendedores_atribuiveis). Vendedor: só os contratos dele, sem "não contatar".
@@ -17,11 +21,7 @@
     { v: 'D91_180', label: '3 a 6 meses', curto: '6 meses', dica: 'de 91 a 180 dias', urg: '' },
     { v: 'D181_365', label: '6 a 12 meses', curto: '12 meses', dica: 'de 181 a 365 dias', urg: '' }
   ];
-  var EXTRAS = { MAIS_1_ANO: 'Mais de 1 ano', ANTERIORES: 'Prazo encerrado há mais de 30 dias' };
-  var TIPOS = [
-    { v: '', label: 'Todos' }, { v: 'NOVOS_LINEAR', label: 'Novos Linear' }, { v: 'NOVOS_BALAO', label: 'Novos Balão' },
-    { v: 'SEMINOVOS_LINEAR', label: 'Seminovos Linear' }, { v: 'SEMINOVOS_BALAO', label: 'Seminovos Balão' }
-  ];
+  var DEPS = [{ v: 'NOVOS', label: 'Novos' }, { v: 'SEMINOVOS', label: 'Seminovos' }];
   var TIPO_LABEL = { NOVOS_LINEAR: 'Novos Linear', NOVOS_BALAO: 'Novos Balão', SEMINOVOS_LINEAR: 'Seminovos Linear', SEMINOVOS_BALAO: 'Seminovos Balão' };
   var POR_PAGINA = 50;
   var MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -78,17 +78,20 @@
   }
 
   function gestor() { return S.dados && S.dados.perfil !== 'VENDEDOR'; }
+  function plural(n, um, varios) { return num(n) + ' ' + (Number(n) === 1 ? um : varios); }
 
   // ---------------------------------------------------------------- carga
   function params(desloc) {
     var f = S.filtros;
-    return { p_tipo: f.tipo || null, p_faixa: f.faixa, p_loja: f.loja || null, p_banco: null, p_vendedor: f.vendedor || null,
-             p_limite: POR_PAGINA, p_deslocamento: desloc || 0, p_abrir: !S.abriuTela, p_busca: f.busca || null, p_ocultar_novo: !!f.ocultarNovo };
+    return { p_tipo: null, p_faixa: f.faixa, p_loja: f.loja || null, p_banco: null, p_vendedor: f.vendedor || null,
+             p_limite: POR_PAGINA, p_deslocamento: desloc || 0, p_abrir: !S.abriuTela, p_busca: f.busca || null, p_ocultar_novo: !!f.ocultarNovo,
+             p_departamento: f.departamento || 'PADRAO' };   // 'PADRAO' = o banco escolhe o departamento do usuário
   }
   function carregar() {
     S.carregando = true; S.erro = null; render();
     return rpc('prospeccao_painel', params(0)).then(function (d) {
       S.abriuTela = true; S.dados = d; S.lista = (d && d.lista) || []; S.carregando = false;
+      if (d && d.departamento) S.filtros.departamento = d.departamento;
       S.aberto = null; S.det = {}; S.sel = {};
       render();
     }).catch(function (e) {
@@ -108,7 +111,7 @@
   // ---------------------------------------------------------------- pedaços da tela
   function contagem(faixa) {
     var r = S.dados && S.dados.resumo; if (!r) return 0;
-    var bloco = r[S.filtros.tipo || 'TODOS'] || {};
+    var bloco = r.TODOS || {};
     return Number(bloco[faixa] || 0);
   }
   function topoHtml() {
@@ -125,31 +128,34 @@
       h += '<button type="button" class="pspFaixa' + (on ? ' isOn' : '') + (f.urg && !zero ? ' urg-' + f.urg : '') + (zero ? ' isZero' : '') + '" data-acao="faixa" data-v="' + f.v + '" aria-pressed="' + on + '" title="' + esc(f.dica) + '">' +
         '<span class="pspFaixaN">' + num(contagem(f.v)) + '</span><span class="pspFaixaR"><span class="pspLongo">' + f.label + '</span><span class="pspCurto">' + f.curto + '</span></span></button>';
     });
-    h += '</nav><div class="pspExtras">';
-    ['MAIS_1_ANO', 'ANTERIORES'].forEach(function (k) {
-      h += '<button type="button" class="pspLinkSec' + (S.filtros.faixa === k ? ' isOn' : '') + '" data-acao="faixa" data-v="' + k + '">' + EXTRAS[k] + ' (' + num(contagem(k)) + ')</button>';
-    });
-    return h + '</div>';
+    return h + '</nav>';
   }
   function avisoDistribuirHtml() {
     if (!gestor() || !S.dados.sem_vendedor) return '';
     var x = S.dados.sem_vendedor[S.filtros.faixa]; if (!x || !x.sem) return '';
-    return '<div class="pspAviso" role="status"><p><b>' + num(x.sem) + ' de ' + num(x.total) + '</b> contratos desta faixa estão sem vendedor. Ninguém da equipe os vê enquanto não forem atribuídos.</p>' +
-      '<div class="pspAvisoAcoes"><button type="button" class="modBtn modBtnSecondary" data-acao="so-sem">' + (S.filtros.vendedor === 'SEM_VENDEDOR' ? 'Ver todos' : 'Ver só os sem vendedor') + '</button>' +
+    var um = Number(x.sem) === 1;
+    return '<div class="pspAviso" role="status"><p><b>' + num(x.sem) + ' de ' + num(x.total) + '</b> ' + (Number(x.total) === 1 ? 'contrato desta faixa' : 'contratos desta faixa') +
+      (um ? ' está' : ' estão') + ' a distribuir (sem vendedor ou com vendedor que saiu). Ninguém da equipe ' + (um ? 'o vê enquanto não for atribuído' : 'os vê enquanto não forem atribuídos') + '.</p>' +
+      '<div class="pspAvisoAcoes"><button type="button" class="modBtn modBtnSecondary" data-acao="so-sem">' + (S.filtros.vendedor === 'A_DISTRIBUIR' ? 'Ver todos' : 'Ver só os a distribuir') + '</button>' +
       '<button type="button" class="modBtn modBtnPrimary" data-acao="dividir">Dividir entre a equipe</button></div></div>';
   }
   function filtrosHtml() {
     var f = S.filtros, d = S.dados || {}, fl = d.filtros || {};
-    var h = '<div class="pspFiltros"><div class="pspChips" role="group" aria-label="Tipo">';
-    TIPOS.forEach(function (t) { h += '<button type="button" class="pspChip' + (f.tipo === t.v ? ' isOn' : '') + '" data-acao="tipo" data-v="' + t.v + '" aria-pressed="' + (f.tipo === t.v) + '">' + t.label + '</button>'; });
-    h += '</div><div class="pspCampos"><input type="search" class="pspBusca" data-campo="busca" placeholder="Buscar cliente pelo nome" value="' + esc(f.busca) + '" aria-label="Buscar cliente pelo nome">';
+    var deps = d.departamentos || [], h = '<div class="pspFiltros">';
+    if (deps.length > 1) {
+      h += '<div class="pspChave" role="group" aria-label="Departamento">';
+      DEPS.forEach(function (x) { var on = f.departamento === x.v; h += '<button type="button" class="pspChaveOp' + (on ? ' isOn' : '') + '" data-acao="dep" data-v="' + x.v + '" aria-pressed="' + on + '">' + x.label + '</button>'; });
+      h += '</div>';
+    }
+    h += '<div class="pspCampos"><input type="search" class="pspBusca" data-campo="busca" placeholder="Buscar cliente pelo nome" value="' + esc(f.busca) + '" aria-label="Buscar cliente pelo nome">';
     if (gestor()) {
       h += '<select data-campo="loja" aria-label="Loja"><option value="">Todas as lojas</option>' +
         (fl.lojas || []).map(function (l) { return '<option value="' + esc(l) + '"' + (f.loja === l ? ' selected' : '') + '>' + esc(loja(l)) + '</option>'; }).join('') + '</select>';
       h += '<select data-campo="vendedor" aria-label="Vendedor"><option value="">Todos os vendedores</option>' +
-        '<option value="SEM_VENDEDOR"' + (f.vendedor === 'SEM_VENDEDOR' ? ' selected' : '') + '>Sem vendedor</option>' +
-        '<option value="VENDEDOR_SAIU"' + (f.vendedor === 'VENDEDOR_SAIU' ? ' selected' : '') + '>Vendedor saiu</option>' +
-        (fl.vendedores || []).filter(function (v) { return !v.saiu; }).map(function (v) { return '<option value="' + esc(v.id) + '"' + (f.vendedor === v.id ? ' selected' : '') + '>' + esc(v.nome) + '</option>'; }).join('') + '</select>';
+        '<option value="A_DISTRIBUIR"' + (f.vendedor === 'A_DISTRIBUIR' ? ' selected' : '') + '>A distribuir (sem vendedor ou saiu)</option>' +
+        '<option value="SEM_VENDEDOR"' + (f.vendedor === 'SEM_VENDEDOR' ? ' selected' : '') + '>· só sem vendedor</option>' +
+        '<option value="VENDEDOR_SAIU"' + (f.vendedor === 'VENDEDOR_SAIU' ? ' selected' : '') + '>· só vendedor saiu</option>' +
+        (fl.vendedores || []).map(function (v) { return '<option value="' + esc(v.id) + '"' + (f.vendedor === v.id ? ' selected' : '') + '>' + esc(v.nome) + '</option>'; }).join('') + '</select>';
     }
     h += '<label class="pspCheck"><input type="checkbox" data-campo="ocultarNovo"' + (f.ocultarNovo ? ' checked' : '') + '> Ocultar quem já fez novo contrato</label></div></div>';
     return h;
@@ -159,9 +165,10 @@
       (r.nao_contatar ? '<span class="pspTag red">não contatar</span>' : '');
   }
   function vendedorHtml(r) {
-    if (!r.vendedor_id) return '<span class="pspSemVend">Sem vendedor</span>';
-    if (r.vendedor_saiu) return '<span class="pspTag amb">Vendedor saiu</span><div class="pspMini">era de ' + esc(r.vendedor) + '</div>';
-    var origem = r.vendedor_origem === 'ATRIBUICAO' ? 'atribuído' + (r.atribuido_por ? ' por ' + esc(primeiro(r.atribuido_por)) : '') : 'da venda original';
+    if (!r.vendedor) return '<span class="pspSemVend">Sem vendedor</span>';
+    if (r.vendedor_saiu) return '<div class="pspNome2">' + esc(r.vendedor) + '</div><span class="pspTag amb">vendedor saiu</span>';
+    var origem = r.vendedor_origem !== 'ATRIBUICAO' ? 'da venda original'
+      : (r.vendedor_original ? 'venda original: ' + esc(r.vendedor_original) : 'atribuído' + (r.atribuido_por ? ' por ' + esc(primeiro(r.atribuido_por)) : ''));
     return '<div class="pspNome2">' + esc(r.vendedor) + '</div><div class="pspMini">' + origem + '</div>';
   }
   function primeiro(n) { return String(n || '').split(' ')[0].replace(/^./, function (c) { return c.toUpperCase(); }).replace(/^(.)(.*)$/, function (m, a, b) { return a + b.toLowerCase(); }); }
@@ -284,7 +291,7 @@
     var marcados = (m.vendedores || []).filter(function (v) { return m.marcados[v.id]; }).length;
     var h = '<div class="pspModalFundo" data-acao="fechar-dividir"></div><div class="pspModal" role="dialog" aria-modal="true" aria-labelledby="pspDivTit">' +
       '<h3 id="pspDivTit">Dividir entre a equipe</h3>' +
-      '<p class="pspMini">' + num(sem) + ' contratos sem vendedor nesta faixa e nos filtros atuais. Cada um só vai para vendedor ativo da mesma loja e departamento; clientes marcados "não contatar" ficam de fora.</p>';
+      '<p class="pspMini">' + plural(sem, 'contrato a distribuir', 'contratos a distribuir') + ' (sem vendedor ou com vendedor que saiu) nesta faixa e nos filtros atuais. Cada um só vai para vendedor ativo da mesma loja e departamento; clientes marcados "não contatar" ficam de fora.</p>';
     if (m.carregando) h += '<div class="modLoadingState">Carregando vendedores…</div>';
     else if (m.erro) h += '<div class="modErrorState">' + esc(m.erro) + '</div>';
     else {
@@ -362,8 +369,8 @@
   function atribuir(ops, vendedor) {
     return rpc('prospeccao_atribuir', { p_ops: ops, p_vendedor: vendedor || null }).then(function (r) {
       var rec = (r && r.recusados) || [];
-      S.msg = num(r.atribuidos) + (vendedor ? (r.atribuidos === 1 ? ' contrato atribuído' : ' contratos atribuídos') : (r.atribuidos === 1 ? ' atribuição retirada' : ' atribuições retiradas')) +
-        (rec.length ? ' · ' + num(rec.length) + ' recusado(s): ' + rec[0].motivo : '') + '.';
+      S.msg = (vendedor ? plural(r.atribuidos, 'contrato atribuído', 'contratos atribuídos') : plural(r.atribuidos, 'atribuição retirada', 'atribuições retiradas')) +
+        (rec.length ? ' · ' + plural(rec.length, 'recusado', 'recusados') + ': ' + rec[0].motivo : '') + '.';
       return carregar();
     }).catch(function (e) { S.msg = (e && e.message) || 'Não foi possível atribuir.'; render(); });
   }
@@ -371,7 +378,8 @@
     var lojasAlvo = S.filtros.loja ? [S.filtros.loja] : ((S.dados.filtros && S.dados.filtros.lojas) || []);
     S.dividir = { carregando: true, marcados: {} }; render();
     var pedidos = [];
-    lojasAlvo.forEach(function (l) { ['NOVOS', 'SEMINOVOS'].forEach(function (d) { pedidos.push(vendedoresDe(l, d).then(function (lst) { return (lst || []).map(function (v) { return { id: v.id, nome: v.nome, loja: l }; }); })); }); });
+    var depsAlvo = S.filtros.departamento ? [S.filtros.departamento] : ['NOVOS', 'SEMINOVOS'];
+    lojasAlvo.forEach(function (l) { depsAlvo.forEach(function (d) { pedidos.push(vendedoresDe(l, d).then(function (lst) { return (lst || []).map(function (v) { return { id: v.id, nome: v.nome, loja: l }; }); })); }); });
     Promise.all(pedidos).then(function (ls) {
       var vistos = {}, lista = [];
       ls.forEach(function (x) { x.forEach(function (v) { if (!vistos[v.id]) { vistos[v.id] = 1; lista.push(v); } }); });
@@ -384,15 +392,15 @@
     var m = S.dividir, ids = Object.keys(m.marcados).filter(function (k) { return m.marcados[k]; });
     m.enviando = true; render();
     var f = S.filtros;
-    rpc('prospeccao_dividir', { p_tipo: f.tipo || null, p_faixa: f.faixa, p_loja: f.loja || null, p_banco: null, p_busca: f.busca || null, p_ocultar_novo: !!f.ocultarNovo, p_vendedores: ids })
+    rpc('prospeccao_dividir', { p_tipo: null, p_faixa: f.faixa, p_loja: f.loja || null, p_banco: null, p_busca: f.busca || null, p_ocultar_novo: !!f.ocultarNovo, p_vendedores: ids, p_departamento: f.departamento || null })
       .then(function (r) {
         m.enviando = false;
         var nomes = {}; (m.vendedores || []).forEach(function (v) { nomes[v.id] = v.nome; });
         var partes = Object.keys(r.por_vendedor || {}).map(function (id) { return num(r.por_vendedor[id]) + ' para ' + (nomes[id] || 'vendedor'); });
         var fora = [];
         if (r.sem_vendedor_apto_na_loja) fora.push(num(r.sem_vendedor_apto_na_loja) + ' sem vendedor escolhido da mesma loja e departamento');
-        if (r.nao_contatar_fora) fora.push(num(r.nao_contatar_fora) + ' marcados "não contatar"');
-        m.resultado = (r.atribuidos ? num(r.atribuidos) + (r.atribuidos === 1 ? ' contrato atribuído: ' : ' contratos atribuídos: ') + partes.join(', ') + '.' : 'Nenhum contrato atribuído.') +
+        if (r.nao_contatar_fora) fora.push(plural(r.nao_contatar_fora, 'marcado "não contatar"', 'marcados "não contatar"'));
+        m.resultado = (r.atribuidos ? plural(r.atribuidos, 'contrato atribuído', 'contratos atribuídos') + ': ' + partes.join(', ') + '.' : 'Nenhum contrato atribuído.') +
           (fora.length ? ' Ficaram de fora: ' + fora.join('; ') + '.' : ' Nenhum ficou de fora.');
         render(); carregar();
       }).catch(function (e) { m.enviando = false; m.erro = (e && e.message) || 'Não foi possível dividir.'; render(); });
@@ -401,14 +409,15 @@
     var H = window.NX_XLSX_EXPORT_HELPER, f = S.filtros;
     if (!H) { S.msg = 'Exportação indisponível nesta página.'; render(); return; }
     S.exportando = true; render();
-    rpc('prospeccao_exportar', { p_tipo: f.tipo || null, p_faixa: f.faixa, p_loja: f.loja || null, p_banco: null, p_vendedor: f.vendedor || null }).then(function (d) {
+    rpc('prospeccao_exportar', { p_tipo: null, p_faixa: f.faixa, p_loja: f.loja || null, p_banco: null, p_vendedor: f.vendedor || null, p_departamento: f.departamento || null }).then(function (d) {
       var linhas = ((d && d.lista) || []).map(function (r) {
         return [r.cliente || '', loja(r.loja), TIPO_LABEL[r.tipo] || r.tipo, r.banco || '', Number(r.parcelas) || 0, Number(r.valor_parcela) || 0,
                 H.excelDateValue(r.data_contrato) || '', H.excelDateValue(r.data_fim) || '', r.balao_valor != null ? Number(r.balao_valor) : '',
-                r.vendedor || 'Sem vendedor', r.vendedor_origem === 'ATRIBUICAO' ? 'Atribuído' : (r.vendedor_origem === 'VENDA' ? 'Venda original' : ''),
+                r.vendedor || 'Sem vendedor', r.vendedor_origem === 'ATRIBUICAO' ? 'Atribuído' : (r.vendedor_origem === 'VENDA' ? (r.vendedor_saiu ? 'Venda original · vendedor saiu' : 'Venda original') : ''),
+                r.vendedor_original || '',
                 r.pj ? 'Sim' : '', r.ja_fez_novo ? 'Sim' : '', r.nao_contatar ? 'Sim' : ''];
       });
-      var cab = ['Cliente', 'Loja', 'Tipo', 'Banco', 'Parcelas', 'Parcela', 'Contrato', 'Termina', 'Parcela final', 'Vendedor', 'Origem do vendedor', 'PJ', 'Já fez novo contrato', 'Não contatar'];
+      var cab = ['Cliente', 'Loja', 'Tipo', 'Banco', 'Parcelas', 'Parcela', 'Contrato', 'Termina', 'Parcela final', 'Vendedor', 'Origem do vendedor', 'Vendedor da venda original', 'PJ', 'Já fez novo contrato', 'Não contatar'];
       H.downloadWorkbook(cab, linhas, 'Prospecção', 'Prospeccao_' + H.excelFileStamp() + '.xlsx', { moneyCols: ['Parcela', 'Parcela final'], dateCols: ['Contrato', 'Termina'] });
       S.exportando = false; render();
     }).catch(function (e) { S.exportando = false; S.msg = (e && e.message) || 'Não foi possível exportar.'; render(); });
@@ -424,8 +433,13 @@
     if (a === 'sel') { e.stopPropagation(); S.sel[op] = alvo.checked; atualizarBarra(); return; }
     if (a === 'sel-todos') { var marcar = alvo.checked; S.lista.forEach(function (r) { S.sel[r.op_codigo] = marcar; }); atualizarBarra(); return; }
     if (a === 'faixa') { S.filtros.faixa = alvo.getAttribute('data-v'); carregar(); return; }
-    if (a === 'tipo') { S.filtros.tipo = alvo.getAttribute('data-v'); carregar(); return; }
-    if (a === 'so-sem') { S.filtros.vendedor = S.filtros.vendedor === 'SEM_VENDEDOR' ? '' : 'SEM_VENDEDOR'; carregar(); return; }
+    if (a === 'dep') {
+      var novo = alvo.getAttribute('data-v'); if (novo === S.filtros.departamento) return;
+      S.filtros.departamento = novo;
+      if (S.filtros.vendedor && ['A_DISTRIBUIR', 'SEM_VENDEDOR', 'VENDEDOR_SAIU'].indexOf(S.filtros.vendedor) < 0) S.filtros.vendedor = '';   // vendedor é de um departamento
+      carregar(); return;
+    }
+    if (a === 'so-sem') { S.filtros.vendedor = S.filtros.vendedor === 'A_DISTRIBUIR' ? '' : 'A_DISTRIBUIR'; carregar(); return; }
     if (a === 'dividir') { abrirDividir(); return; }
     if (a === 'fechar-dividir') { S.dividir = null; render(); return; }
     if (a === 'div-vend') { S.dividir.marcados[alvo.getAttribute('data-id')] = alvo.checked; render(); return; }
@@ -481,7 +495,7 @@
       if (outletRef !== outlet) { outlet.addEventListener('click', onClick); outlet.addEventListener('change', onChange); outlet.addEventListener('input', onInput); }
       if (!outletRef) document.addEventListener('keydown', onKey);
       outletRef = outlet;
-      S = { filtros: { faixa: 'PROX_30', tipo: '', loja: '', vendedor: '', busca: '', ocultarNovo: false },
+      S = { filtros: { faixa: 'PROX_30', departamento: '', loja: '', vendedor: '', busca: '', ocultarNovo: false },
             dados: null, lista: [], erro: null, msg: null, carregando: false, carregandoMais: false, exportando: false,
             aberto: null, det: {}, sel: {}, barra: null, dividir: null, abriuTela: false, cacheVend: {} };
       return carregar();
