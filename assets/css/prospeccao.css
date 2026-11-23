@@ -69,6 +69,7 @@
 .pspTag { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 5px; margin: 2px 4px 0 0; background: rgba(255,255,255,.08); color: #d7d7dc; }
 .pspTag.amb { background: rgba(240,180,41,.14); color: #f5c451; }
 .pspTag.red { background: rgba(227,6,19,.18); color: #ff7b82; }
+.pspTag.ok { background: rgba(46,204,113,.14); color: #6fdc9c; }
 .pspSemVend { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; border: 1px dashed rgba(255,255,255,.35); color: var(--color-text-secondary, #c9c9cf); }
 .pspSeta { color: var(--color-text-muted, #9a9aa2); text-align: center; }
 .pspSelCol { width: 36px; }

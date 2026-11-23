@@ -161,7 +161,7 @@
     return h;
   }
   function etiquetas(r) {
-    return (r.pj ? '<span class="pspTag">PJ</span>' : '') + (r.ja_fez_novo ? '<span class="pspTag amb">já fez novo contrato</span>' : '') +
+    return (r.proprio && gestor() ? '<span class="pspTag ok">seu cliente</span>' : '') + (r.pj ? '<span class="pspTag">PJ</span>' : '') + (r.ja_fez_novo ? '<span class="pspTag amb">já fez novo contrato</span>' : '') +
       (r.nao_contatar ? '<span class="pspTag red">não contatar</span>' : '');
   }
   function vendedorHtml(r) {
@@ -327,7 +327,7 @@
         (S.msg ? '<div class="pspMsg" role="status">' + esc(S.msg) + ' <button type="button" class="pspLinkSec" data-acao="fechar-msg">ok</button></div>' : '') +
         (S.carregando ? '<div class="modLoadingState pspAtualizando">Atualizando…</div>' : '') + listaHtml();
     }
-    h += '</div>' + barraSelHtml() + dividirHtml();
+    h += '</div>' + barraSelHtml() + dividirHtml() + confirmarTrocaHtml();
     var foco = document.activeElement, focoBusca = foco && foco.classList && foco.classList.contains('pspBusca'), pos = focoBusca ? foco.selectionStart : null;
     outletRef.innerHTML = h;
     if (focoBusca) { var b = outletRef.querySelector('.pspBusca'); if (b) { b.focus(); try { b.setSelectionRange(pos, pos); } catch (e) { /* */ } } }
@@ -373,13 +373,30 @@
       render();
     }).catch(function (e) { S.barra = { erro: (e && e.message) || 'erro ao carregar' }; render(); });
   }
-  function atribuir(ops, vendedor) {
-    return rpc('prospeccao_atribuir', { p_ops: ops, p_vendedor: vendedor || null }).then(function (r) {
-      var rec = (r && r.recusados) || [];
+  function atribuir(ops, vendedor, confirmado) {
+    return rpc('prospeccao_atribuir', { p_ops: ops, p_vendedor: vendedor || null, p_confirmar: !!confirmado }).then(function (r) {
+      var rec = (r && r.recusados) || [], conf = (r && r.precisa_confirmar) || [];
+      if (conf.length) {   // o cliente é de quem vendeu: tirar de um vendedor ativo só confirmando (fica registrado)
+        S.confirmarTroca = { ops: conf.map(function (x) { return x.op; }), vendedor: vendedor || null, lista: conf, feitos: r.atribuidos };
+        render(); var b = outletRef.querySelector('.pspModal [data-acao="cancelar-troca"]'); if (b) b.focus();
+        return;
+      }
       S.msg = (vendedor ? plural(r.atribuidos, 'contrato atribuído', 'contratos atribuídos') : plural(r.atribuidos, 'atribuição retirada', 'atribuições retiradas')) +
         (rec.length ? ' · ' + plural(rec.length, 'recusado', 'recusados') + ': ' + rec[0].motivo : '') + '.';
       return carregar();
     }).catch(function (e) { S.msg = (e && e.message) || 'Não foi possível atribuir.'; render(); });
+  }
+  function confirmarTrocaHtml() {
+    var m = S.confirmarTroca; if (!m) return '';
+    var donos = {}; m.lista.forEach(function (x) { donos[x.dono || 'vendedor'] = (donos[x.dono || 'vendedor'] || 0) + 1; });
+    var nomes = Object.keys(donos).map(function (n) { return esc(n) + (donos[n] > 1 ? ' (' + num(donos[n]) + ')' : ''); }).join(', ');
+    return '<div class="pspModalFundo" data-acao="cancelar-troca"></div><div class="pspModal" role="alertdialog" aria-modal="true" aria-labelledby="pspTrocaTit">' +
+      '<h3 id="pspTrocaTit">' + (m.lista.length === 1 ? 'Este cliente é de um vendedor ativo' : 'Estes clientes são de vendedores ativos') + '</h3>' +
+      '<p>' + plural(m.lista.length, 'contrato é', 'contratos são') + ' de quem fez a venda: <b>' + nomes + '</b>. ' +
+      (m.vendedor ? 'Trocar o vendedor tira o cliente dele.' : 'Tirar a atribuição devolve o cliente ao vendedor da venda original.') + ' A troca fica registrada.</p>' +
+      (m.feitos ? '<p class="pspMini">' + plural(m.feitos, 'outro contrato já foi atribuído', 'outros contratos já foram atribuídos') + '.</p>' : '') +
+      '<div class="pspModalAcoes"><button type="button" class="modBtn modBtnSecondary" data-acao="cancelar-troca">Cancelar</button>' +
+      '<button type="button" class="modBtn modBtnPrimary" data-acao="confirmar-troca">' + (m.lista.length === 1 ? 'Sim, trocar' : 'Sim, trocar os ' + num(m.lista.length)) + '</button></div></div>';
   }
   function abrirDividir() {
     var lojasAlvo = S.filtros.loja ? [S.filtros.loja] : ((S.dados.filtros && S.dados.filtros.lojas) || []);
@@ -448,6 +465,8 @@
     }
     if (a === 'so-sem') { S.filtros.vendedor = S.filtros.vendedor === 'A_DISTRIBUIR' ? '' : 'A_DISTRIBUIR'; carregar(); return; }
     if (a === 'dividir') { abrirDividir(); return; }
+    if (a === 'cancelar-troca') { var feitos = S.confirmarTroca && S.confirmarTroca.feitos; S.confirmarTroca = null; if (feitos) carregar(); else render(); return; }
+    if (a === 'confirmar-troca') { var t = S.confirmarTroca; S.confirmarTroca = null; atribuir(t.ops, t.vendedor, true); return; }
     if (a === 'fechar-dividir') { S.dividir = null; render(); return; }
     if (a === 'div-vend') { S.dividir.marcados[alvo.getAttribute('data-id')] = alvo.checked; render(); return; }
     if (a === 'confirmar-dividir') { confirmarDividir(); return; }
@@ -462,7 +481,8 @@
       return;
     }
     if (a === 'atribuir-um') {
-      var s = outletRef.querySelector('select[data-campo="atribuirUm"][data-op="' + op + '"]');
+      // o detalhe existe na tabela (computador) e no cartão (celular): usa o seletor do MESMO detalhe do botão clicado
+      var caixa = alvo.closest('.pspDet') || outletRef, s = caixa.querySelector('select[data-campo="atribuirUm"][data-op="' + op + '"]');
       if (!s || !s.value) { S.msg = 'Escolha o vendedor.'; render(); return; }
       atribuir([op], s.value); return;
     }
@@ -490,6 +510,7 @@
   }
   function onKey(e) {
     if (!outletRef || !document.body.contains(outletRef)) return;
+    if (e.key === 'Escape' && S.confirmarTroca) { S.confirmarTroca = null; render(); return; }
     if (e.key === 'Escape' && S.dividir) { S.dividir = null; render(); return; }
     var linha = e.target.closest && e.target.closest('.pspLinha');
     if (linha && (e.key === 'Enter' || e.key === ' ') && e.target === linha) { e.preventDefault(); S.focarOp = linha.getAttribute('data-op'); abrir(S.focarOp); }
