@@ -216,12 +216,43 @@
   var CHECK = '<svg class="fatEstadoIco" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function estadoPag(r) {
     var dif = Number(r.pagamento.diferenca || 0);
-    return '<span class="fatEstado fatEstadoPag' + (dif ? ' fatEstadoDif' : '') + '" title="' + esc('Crédito de ' + brl2(r.pagamento.valor_creditado) + (dif ? ' (diferença de ' + brl2(dif) + ')' : '')) + '">' +
-      CHECK + '<span>Crédito informado' + (dif ? ' · com diferença' : '') + '</span></span>';
+    return '<span class="fatEstado fatEstadoOk fatEstadoPag' + (dif ? ' fatEstadoDif' : '') + '" title="' + esc('Crédito de ' + brl2(r.pagamento.valor_creditado) + (dif ? ' (diferença de ' + brl2(dif) + ')' : '')) + '">' +
+      (dif ? '<i aria-hidden="true"></i>' : CHECK) + '<span>Crédito informado' + (dif ? ' · com diferença' : '') + '</span></span>';
   }
   function estadoReb(r) {
-    return '<span class="fatEstado fatEstadoReb" title="' + esc('Rebate de ' + brl2(r.rebate.valor)) + '">' + CHECK + '<span>Rebate informado</span></span>';
+    return '<span class="fatEstado fatEstadoOk fatEstadoReb" title="' + esc('Rebate de ' + brl2(r.rebate.valor)) + '">' + CHECK + '<span>Rebate informado</span></span>';
   }
+  // 23/11/2026 (Luis, limpeza da lista): marcadores em TEXTO discreto (sem borda, sem fundo) no lugar das pílulas.
+  // Cor só onde informa: verde = concluído, amarelo = pendência/diferença; o resto neutro.
+  var SETA = '<svg class="fatSeta" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function marcaSubs(r) { return r && r.subsidiado ? '<span class="fatMarca" title="Plano 999 (Subsidiado)">Subsidiada</span>' : ''; }
+  function marcaOutra(r) { return outraLoja(r) ? ' <small class="fatOutraTxt" title="' + esc('Pago na conta de outra loja: ' + loja(r.pagamento.conta_loja)) + '">outra loja</small>' : ''; }
+  // pendência só em texto e só para quem NÃO tem o botão (quem preenche já vê a ação: não repete a informação)
+  function faltaTxt(r) {
+    if (!aCompletar(r) || r.pode_preencher) return '';
+    var o = [];
+    if (falta(r, 'PAGAMENTO')) o.push('crédito');
+    if (falta(r, 'REBATE')) o.push('rebate');
+    return '<span class="fatEstado fatEstadoPend" title="' + esc('Falta: ' + o.join(' e ')) + '"><i aria-hidden="true"></i><span>Falta ' + o.join(' e ') + '</span></span>';
+  }
+  function estadoJust(r) {
+    var st = justStatus(r);
+    if (st === 'NAO_SE_APLICA') return '<span class="fatJustNa">—</span>';
+    if (st === 'SEM') return '<span class="fatEstado fatEstadoPend"><i aria-hidden="true"></i><span>Sem justificativa</span></span>';
+    if (st === 'DESATUALIZADA') return '<span class="fatEstado fatEstadoPend" title="A última justificativa tem mais de 3 dias úteis e a proposta continua em aberto."><i aria-hidden="true"></i><span>Justificativa desatualizada</span></span>';
+    var d = Number(r.just.dias_uteis || 0);
+    return '<span class="fatEstado fatEstadoOk">' + CHECK + '<span>' + (d === 0 ? 'Justificada hoje' : 'Justificada há ' + d + ' dia' + (d > 1 ? 's' : '') + ' út' + (d > 1 ? 'eis' : 'il')) + '</span></span>';
+  }
+  function estadoRetorno(r) {
+    var t = r.retorno;
+    if (!t) return '';
+    if (t.resposta) return '<span class="fatEstado fatEstadoOk" title="' + esc('Respondido por ' + titulo(t.resposta.por) + ' em ' + dataHora(t.resposta.em)) + '">' + CHECK + '<span>Retorno respondido ' + esc(dataCurta(t.resposta.em)) + '</span></span>';
+    return '<span class="fatEstado fatEstadoPend" title="' + esc('Pedido por ' + titulo(t.solicitado_por) + ' em ' + dataHora(t.solicitado_em) + (t.email_erro ? ' — o e-mail não saiu; o aviso no Portal foi criado' : '')) + '"><i aria-hidden="true"></i>' +
+      '<span>Retorno solicitado ' + esc(dataCurta(t.solicitado_em)) + (t.teste ? ' · teste' : '') + '</span></span>';
+  }
+  // a linha (ou o cartão) inteira abre o "+ detalhes"; os botões dentro dela continuam com a própria ação
+  function abre(r) { return ' data-acao="detalhe" data-id="' + esc(r._k) + '" tabindex="0" aria-label="' + esc('Abrir os detalhes da proposta ' + chassiDe(r)) + '"'; }
+  function bancoTxt(r) { return '<span class="fatCorta" title="' + esc(r.banco || '—') + '">' + esc(r.banco || '—') + '</span>' + marcaSubs(r); }
   function editarLink(r, acao, rotulo) {
     return r.pode_preencher ? '<button type="button" class="fatEditar" data-acao="' + acao + '" data-id="' + esc(r._k) + '" aria-label="' + esc(rotulo) + '">Editar</button>' : '';
   }
@@ -354,32 +385,30 @@
   }
   function linhaPagaHtml(r) {
     var p = r.pagamento;
-    return '<tr class="fatLinha fatLinhaPaga' + (aCompletar(r) ? ' fatFalta' : '') + '">' +
-      '<td class="fatMono">' + esc(chassiDe(r)) + '<br>' + seloOrigem(r) + '</td>' +
+    return '<tr class="fatLinha fatLinhaPaga fatAbre' + (aCompletar(r) ? ' fatFalta' : '') + '"' + abre(r) + '>' +
+      '<td class="fatMono"><span class="fatChassi">' + esc(chassiDe(r)) + '</span>' + seloOrigem(r) + '</td>' +
       '<td class="fatCorta" title="' + esc(loja(r.loja)) + '">' + esc(loja(r.loja)) + '</td>' +
-      '<td class="fatCorta" title="' + esc(r.banco || '—') + '">' + esc(r.banco || '—') + '</td>' +
+      '<td class="fatColBanco">' + bancoTxt(r) + '</td>' +
       '<td class="fatNum">' + finTxt(r) + '</td>' +
       '<td class="fatNum">' + esc(data(r.faturamento)) + '</td>' +
       '<td class="fatNum">' + (p ? esc(data(p.data_credito)) : '<span class="modMuted">—</span>') + '</td>' +
-      '<td class="fatCorta">' + (p ? esc(loja(p.conta_loja)) : '<span class="modMuted">—</span>') + '</td>' +
+      '<td class="fatColConta">' + (p ? '<span class="fatCorta" title="' + esc(loja(p.conta_loja)) + '">' + esc(loja(p.conta_loja)) + '</span>' + marcaOutra(r) : '<span class="modMuted">—</span>') + '</td>' +
       '<td class="fatNum">' + creditoTxt(r) + '</td>' +
-      '<td class="fatColJust">' + seloCompletar(r) + seloOutraLoja(r) + seloSubs(r) + '</td>' +
-      '<td class="fatColAcao">' + botaoPag(r) + botaoReb(r) +
-      '<button type="button" class="fatMais" data-acao="detalhe" data-id="' + esc(r._k) + '" aria-label="Mais detalhes da proposta ' + esc(chassiDe(r)) + '">+ detalhes</button></td></tr>';
+      '<td class="fatColSit"><div class="fatSitLinha">' + botaoPag(r) + botaoReb(r) + faltaTxt(r) + '</div></td>' +
+      '<td class="fatColSeta">' + SETA + '</td></tr>';
   }
   function cartaoPagoHtml(r) {
     var p = r.pagamento;
-    return '<li class="fatCartao fatCartaoPago' + (aCompletar(r) ? ' fatFalta' : '') + '"><div class="fatCartaoTopo"><span class="fatBadge fatPAGA">Paga</span>' +
-      '<span class="fatCartaoDias">faturada ' + esc(data(r.faturamento)) + '</span></div>' +
+    return '<li class="fatCartao fatCartaoPago fatAbre' + (aCompletar(r) ? ' fatFalta' : '') + '"' + abre(r) + '><div class="fatCartaoTopo"><span class="fatBadge fatPAGA">Paga</span>' +
+      '<span class="fatCartaoDias">faturada ' + esc(data(r.faturamento)) + SETA + '</span></div>' +
       '<p class="fatCartaoModelo">' + esc(seLigado(r, r.modelo)) + '</p>' +
       '<p class="fatMono fatCartaoChassi">' + esc(chassiDe(r)) + ' ' + seloOrigem(r) + '</p>' +
-      (aCompletar(r) || outraLoja(r) || r.subsidiado ? '<p class="fatCartaoJust">' + seloCompletar(r) + seloOutraLoja(r) + seloSubs(r) + '</p>' : '') +
-      '<dl><div><dt>Loja</dt><dd>' + esc(loja(r.loja)) + '</dd></div><div><dt>Banco</dt><dd>' + esc(r.banco || '—') + '</dd></div>' +
+      '<dl><div><dt>Loja</dt><dd>' + esc(loja(r.loja)) + '</dd></div><div><dt>Banco</dt><dd>' + esc(r.banco || '—') + (r.subsidiado ? ' · ' + marcaSubs(r) : '') + '</dd></div>' +
       '<div><dt>Financiado</dt><dd>' + finTxt(r) + '</dd></div>' +
-      '<div><dt>Crédito</dt><dd>' + (p ? esc(data(p.data_credito)) + ' · ' + esc(loja(p.conta_loja)) : '—') + '</dd></div>' +
+      '<div><dt>Crédito</dt><dd>' + (p ? esc(data(p.data_credito)) + ' · ' + esc(loja(p.conta_loja)) + marcaOutra(r) : '—') + '</dd></div>' +
       '<div><dt>Valor creditado</dt><dd>' + creditoTxt(r) + '</dd></div>' +
       (r.subsidiado ? '<div><dt>Rebate</dt><dd>' + (r.rebate ? esc(brl2(r.rebate.valor)) : '—') + '</dd></div>' : '') + '</dl>' +
-      '<div class="fatCartaoAcoes">' + botaoPag(r) + botaoReb(r) + '<button type="button" class="fatMais" data-acao="detalhe" data-id="' + esc(r._k) + '">+ detalhes</button></div></li>';
+      '<div class="fatCartaoAcoes">' + botaoPag(r) + botaoReb(r) + faltaTxt(r) + '</div></li>';
   }
   function pagasListaHtml() {
     var lista = pagasFiltradas().slice().sort(function (a, b) {
@@ -389,9 +418,9 @@
     var h = '<section class="fatLista"><h2 class="modSectionTitle">' + tit + ' <span class="modMuted">(' + lista.length + ')</span></h2>';
     if (!lista.length) return h + '<div class="modEmptyState">' + (S.filtros.sit === 'COMPLETAR' ? 'Nenhuma proposta paga com dados a completar.' : 'Nenhuma proposta paga com esses filtros.') + '</div></section>';
     h += '<div class="fatGrupo fatPagas"><div class="fatTabela"><table class="fatTab fatTabPagas"><colgroup><col class="pChassi"><col class="pLoja"><col class="pBanco">' +
-      '<col class="pValor"><col class="pData"><col class="pData"><col class="pConta"><col class="pCred"><col class="pSit"><col class="pAcao"></colgroup>' +
+      '<col class="pValor"><col class="pData"><col class="pData"><col class="pConta"><col class="pCred"><col class="pSit"><col class="pSeta"></colgroup>' +
       '<thead><tr><th>Chassi</th><th>Loja</th><th>Banco</th><th class="fatNum">Financiado</th><th class="fatNum">Faturamento</th>' +
-      '<th class="fatNum">Crédito em</th><th>Conta (loja)</th><th class="fatNum">Valor creditado</th><th>Situação</th><th class="fatColAcao"><span class="fatSr">Ações</span></th></tr></thead><tbody>' +
+      '<th class="fatNum">Crédito em</th><th>Conta (loja)</th><th class="fatNum">Valor creditado</th><th>Situação</th><th class="fatColSeta"><span class="fatSr">Abrir detalhes</span></th></tr></thead><tbody>' +
       lista.map(linhaPagaHtml).join('') + '</tbody></table></div>' +
       '<ul class="fatCartoes">' + lista.map(cartaoPagoHtml).join('') + '</ul></div>';
     return h + '<p class="modMuted fatNota">Pagas segundo a atualização dos dados do banco, faturadas a partir de ' + esc(corteTxt()) + '. ' +
@@ -478,28 +507,28 @@
   // na linha: o Financeiro vê "Solicitar retorno" (não justifica); Master e Analistas veem "Justificar demora"
   function acoesLinha(r) { return botaoVincular(r) + (pode('pode_justificar') ? botaoJust(r) : botaoRetorno(r)) + botaoReb(r); }
   function linhaHtml(r) {
-    return '<tr class="fatLinha fat' + r.faixa + '">' +
+    return '<tr class="fatLinha fatAbre fat' + r.faixa + (aCompletar(r) ? ' fatFalta' : '') + '"' + abre(r) + '>' +
       '<td class="fatColDias"><b>' + esc(r.dias) + '</b></td>' +
-      '<td class="fatMono">' + esc(chassiDe(r)) + '<br>' + seloOrigem(r) + '</td>' +
+      '<td class="fatMono"><span class="fatChassi">' + esc(chassiDe(r)) + '</span>' + seloOrigem(r) + '</td>' +
       '<td class="fatCorta" title="' + esc(seLigado(r, r.modelo)) + '">' + esc(seLigado(r, r.modelo)) + '</td>' +
       '<td class="fatCorta" title="' + esc(loja(r.loja)) + '">' + esc(loja(r.loja)) + '</td>' +
-      '<td class="fatCorta" title="' + esc(r.banco || '—') + '">' + esc(r.banco || '—') + '</td>' +
+      '<td class="fatColBanco">' + bancoTxt(r) + '</td>' +
       '<td class="fatNum">' + finTxt(r, brl) + '</td>' +
       '<td class="fatNum">' + esc(fatTxt(r)) + '</td>' +
-      '<td class="fatColJust">' + seloJust(r) + seloRetorno(r) + seloCompletar(r) + seloSubs(r) + '</td>' +
-      '<td class="fatColAcao">' + acoesLinha(r) +
-      '<button type="button" class="fatMais" data-acao="detalhe" data-id="' + esc(r._k) + '" aria-label="Mais detalhes da proposta ' + esc(chassiDe(r)) + '">+ detalhes</button></td></tr>';
+      '<td class="fatColJust">' + estadoJust(r) + estadoRetorno(r) + '</td>' +
+      '<td class="fatColSit"><div class="fatSitLinha">' + acoesLinha(r) + faltaTxt(r) + '</div></td>' +
+      '<td class="fatColSeta">' + SETA + '</td></tr>';
   }
   function cartaoHtml(r) {
-    return '<li class="fatCartao fat' + r.faixa + '"><div class="fatCartaoTopo">' + badge(r.faixa) +
-      '<span class="fatCartaoDias"><b>' + esc(r.dias) + '</b> dias úteis</span></div>' +
+    return '<li class="fatCartao fatAbre fat' + r.faixa + (aCompletar(r) ? ' fatFalta' : '') + '"' + abre(r) + '><div class="fatCartaoTopo">' + badge(r.faixa) +
+      '<span class="fatCartaoDias"><b>' + esc(r.dias) + '</b> dias úteis' + SETA + '</span></div>' +
       '<p class="fatCartaoModelo">' + esc(seLigado(r, r.modelo)) + '</p>' +
       '<p class="fatMono fatCartaoChassi">' + esc(chassiDe(r)) + ' ' + seloOrigem(r) + '</p>' +
-      (pedeJust(r) || r.retorno || aCompletar(r) || r.subsidiado ? '<p class="fatCartaoJust">' + (pedeJust(r) ? seloJust(r) : '') + seloRetorno(r) + seloCompletar(r) + seloSubs(r) + '</p>' : '') +
-      '<dl><div><dt>Loja</dt><dd>' + esc(loja(r.loja)) + '</dd></div><div><dt>Banco</dt><dd>' + esc(r.banco || '—') + '</dd></div>' +
+      (pedeJust(r) || r.retorno ? '<p class="fatCartaoSit">' + (pedeJust(r) ? estadoJust(r) : '') + estadoRetorno(r) + '</p>' : '') +
+      '<dl><div><dt>Loja</dt><dd>' + esc(loja(r.loja)) + '</dd></div><div><dt>Banco</dt><dd>' + esc(r.banco || '—') + (r.subsidiado ? ' · ' + marcaSubs(r) : '') + '</dd></div>' +
       '<div><dt>Financiado</dt><dd>' + finTxt(r, brl) + '</dd></div><div><dt>Faturamento</dt><dd>' + esc(fatTxt(r)) + '</dd></div>' +
       (r.subsidiado ? '<div><dt>Rebate</dt><dd>' + (r.rebate ? esc(brl2(r.rebate.valor)) : '—') + '</dd></div>' : '') + '</dl>' +
-      '<div class="fatCartaoAcoes">' + acoesLinha(r) + '<button type="button" class="fatMais" data-acao="detalhe" data-id="' + esc(r._k) + '">+ detalhes</button></div></li>';
+      (acoesLinha(r) || faltaTxt(r) ? '<div class="fatCartaoAcoes">' + acoesLinha(r) + faltaTxt(r) + '</div>' : '') + '</li>';
   }
   function listaHtml() {
     var lista = ordenar(filtradas());
@@ -511,9 +540,9 @@
       h += '<div class="fatGrupo fat' + x.v + '"><h3 class="fatGrupoTopo"><span class="fatGrupoNome"><i aria-hidden="true"></i>' + esc(x.label) +
         ' <small>' + esc(x.dias) + '</small></span><span class="fatGrupoTot">' + g.length + ' proposta' + (g.length > 1 ? 's' : '') + ' · ' + esc(brl(soma(g))) + '</span></h3>' +
         '<div class="fatTabela"><table class="fatTab"><colgroup><col class="cDias"><col class="cChassi"><col class="cModelo"><col class="cLoja"><col class="cBanco">' +
-        '<col class="cValor"><col class="cData"><col class="cJust"><col class="cAcao"></colgroup>' +
+        '<col class="cValor"><col class="cData"><col class="cJust"><col class="cAcao"><col class="cSeta"></colgroup>' +
         '<thead><tr><th class="fatColDias">Dias úteis</th><th>Chassi</th><th>Modelo</th><th>Loja</th><th>Banco</th><th class="fatNum">Financiado</th>' +
-        '<th class="fatNum">Faturamento</th><th>Justificativa</th><th class="fatColAcao"><span class="fatSr">Ações</span></th></tr></thead><tbody>' +
+        '<th class="fatNum">Faturamento</th><th>Justificativa</th><th>Ações</th><th class="fatColSeta"><span class="fatSr">Abrir detalhes</span></th></tr></thead><tbody>' +
         g.map(linhaHtml).join('') + '</tbody></table></div>' +
         '<ul class="fatCartoes">' + g.map(cartaoHtml).join('') + '</ul></div>';
     });
@@ -995,7 +1024,7 @@
       render(); focar('.fatJustBtn[data-id="' + F.k + '"]'); return;
     }
     var k = S.detalhe; S.detalhe = null; render();
-    focar('.fatMais[data-id="' + (focoAntes || k) + '"]'); focoAntes = null;
+    focar('.fatAbre[data-id="' + (focoAntes || k) + '"]'); focoAntes = null;
   }
   function focar(sel) {
     var l = outletRef.querySelectorAll(sel);
@@ -1097,6 +1126,9 @@
     else salvar();
   }
   function onKey(e) {
+    // linha/cartão com foco: Enter ou Espaço abre os detalhes (os botões dentro dela têm o próprio comportamento)
+    if (S && outletRef && (e.key === 'Enter' || e.key === ' ') && e.target && e.target.classList && e.target.classList.contains('fatAbre') && outletRef.contains(e.target)
+        && !(S.detalhe || S.form || S.ret || S.vinc || S.pag || S.reb)) { e.preventDefault(); e.target.click(); return; }
     if (!S || !(S.detalhe || S.form || S.ret || S.vinc || S.pag || S.reb)) return;
     if (e.key === 'Escape') { e.preventDefault(); fecharPainel(); return; }
     if (e.key === 'Tab') {   // mantém o foco dentro do painel

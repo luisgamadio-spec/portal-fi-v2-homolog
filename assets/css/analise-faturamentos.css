@@ -384,3 +384,67 @@ button.fatPagNum:focus-visible { outline: var(--focus-ring); outline-offset: 2px
   .fatCartaoAcoes { flex-wrap: wrap; }
   .fatCartaoAcoes > button { flex: 1 1 140px; }
 }
+
+/* ==== 23/11/2026 (Luis): limpeza visual da lista (FATURADOS e PAGOS) ====
+   marcadores em texto (sem borda/fundo), uma altura só por linha, botões pequenos lado a lado, a linha inteira abre o detalhe */
+.fatTab td { height: 56px; }
+.fatTab td.fatMono, .fatTab td.fatColBanco, .fatTab td.fatColConta, .fatTab td.fatNum { line-height: 1.25; }
+.fatChassi { display: block; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+.fatTab td.fatNum, .fatCartao dd { font-variant-numeric: tabular-nums; }
+/* origem do chassi e "com tarifas": texto pequeno, sem pílula */
+.fatOrigem { display: block; width: fit-content; margin-top: 2px; padding: 0; border: 0; border-radius: 0; background: none; font-size: 0.625rem; color: var(--mod-muted); }
+.fatOrigemDOCUMENTO, .fatOrigemMANUAL { color: var(--mod-muted); }
+.fatOrigemSem { color: var(--fat-atencao); }
+.fatCartaoChassi .fatOrigem { display: inline; margin-left: 6px; }
+.fatValBase03 { border: 0; padding: 0; border-radius: 0; background: none; }
+.fatNum .fatValBase03 { margin: 2px 0 0 auto; }
+/* banco + "Subsidiada" (marcador discreto na linha de baixo) e conta + "outra loja" */
+.fatTab td.fatColBanco > .fatCorta, .fatTab td.fatColConta > .fatCorta { display: block; overflow: hidden; text-overflow: ellipsis; }
+.fatMarca { font-size: 0.6875rem; color: var(--color-text-secondary); white-space: nowrap; }
+.fatTab td .fatMarca { display: block; margin-top: 2px; }
+.fatOutraTxt { font-size: 0.6875rem; color: var(--color-text-secondary); white-space: nowrap; }
+.fatTab td .fatOutraTxt { display: block; margin-top: 2px; }
+/* situação/ações: tudo numa linha só, lado a lado */
+.fatTab td.fatColSit { overflow: hidden; white-space: nowrap; padding-right: 4px; }
+.fatSitLinha { display: flex; align-items: center; gap: 6px 12px; flex-wrap: nowrap; min-width: 0; }
+.fatSitLinha > button { flex: none; margin: 0 !important; }
+.fatTab .fatSitLinha > button, .fatCartaoAcoes > button { padding: 4px 9px !important; font-size: 0.71875rem; line-height: 1.3; }
+.fatEstado { padding: 0; margin: 0; flex: none; }
+.fatEstado i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; display: inline-block; }
+.fatEstadoOk { color: var(--color-text-secondary); }
+.fatEstadoOk .fatEstadoIco { color: var(--fat-normal); }
+.fatEstadoPend, .fatEstadoDif, .fatEstadoDif .fatEstadoIco { color: var(--fat-atencao); }
+.fatColJust .fatEstado { display: flex; margin: 1px 0; width: fit-content; max-width: 100%; white-space: nowrap; overflow: hidden; }
+.fatColJust .fatEstado > span { overflow: hidden; text-overflow: ellipsis; }
+/* seta discreta e a linha clicável */
+.fatTab col.pSeta, .fatTab col.cSeta { width: 30px; }
+.fatTab td.fatColSeta { padding: 0 8px 0 0; text-align: right; color: var(--mod-muted); }
+.fatSeta { width: 14px; height: 14px; vertical-align: middle; flex: none; }
+.fatAbre { cursor: pointer; }
+.fatTab tr.fatAbre:hover td.fatColSeta, .fatCartao.fatAbre:hover .fatSeta { color: var(--color-text-primary); }
+.fatTab tr.fatAbre:focus-visible { outline: none; }
+.fatTab tr.fatAbre:focus-visible td { background: var(--mod-surface-hover); box-shadow: inset 0 2px 0 var(--mod-accent), inset 0 -2px 0 var(--mod-accent); }
+.fatTab tr.fatAbre:focus-visible td:first-child { box-shadow: inset 2px 2px 0 var(--mod-accent), inset 0 -2px 0 var(--mod-accent); }
+.fatTab tr.fatAbre:focus-visible td:last-child { box-shadow: inset -2px 2px 0 var(--mod-accent), inset 0 -2px 0 var(--mod-accent); }
+.fatCartao.fatAbre:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+/* pendente: faixa amarela à esquerda (PAGOS e FATURADOS) */
+.fatTab tr.fatFalta td:first-child { box-shadow: inset 3px 0 0 var(--fat-atencao); }
+.fatTab tr.fatFalta.fatAbre:focus-visible td:first-child { box-shadow: inset 3px 0 0 var(--fat-atencao), inset 0 2px 0 var(--mod-accent), inset 0 -2px 0 var(--mod-accent); }
+/* colunas — PAGOS */
+.fatTabela { position: relative; }   /* o rótulo invisível (.fatSr) do cabeçalho não escapa da área de rolagem da tabela */
+.fatTabPagas col.pChassi { width: 142px; } .fatTabPagas col.pBanco { width: 96px; } .fatTabPagas col.pValor { width: 108px; }
+.fatTabPagas col.pData { width: 82px; } .fatTabPagas col.pConta { width: 118px; } .fatTabPagas col.pCred { width: 108px; } .fatTabPagas col.pSit { width: 318px; }
+.fatTabPagas { min-width: 1150px; }
+/* colunas — FATURADOS */
+.fatTab col.cDias { width: 64px; } .fatTab col.cChassi { width: 142px; } .fatTab col.cLoja { width: 104px; } .fatTab col.cBanco { width: 100px; } .fatTab col.cValor { width: 96px; }
+.fatTab col.cData { width: 86px; } .fatTab col.cJust { width: 214px; } .fatTab col.cAcao { width: 236px; }
+.fatGrupo .fatTab:not(.fatTabPagas) { min-width: 1150px; }
+.fatGrupo .fatTab:not(.fatTabPagas) .fatSitLinha { flex-wrap: wrap; row-gap: 4px; }   /* 3 ações juntas (raro): quebra em vez de cortar */
+/* cartões (celular) */
+.fatCartaoDias { display: inline-flex; align-items: center; gap: 4px; }
+.fatCartaoDias .fatSeta { margin-left: 4px; color: var(--mod-muted); }
+.fatCartaoSit { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.75rem; }
+.fatCartao dd .fatOutraTxt, .fatCartao dd .fatMarca { font-size: 0.6875rem; }
+
+.fatCartaoAcoes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.fatCartaoAcoes > button { flex: 0 1 auto !important; }
