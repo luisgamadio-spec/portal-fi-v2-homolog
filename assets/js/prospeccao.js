@@ -203,11 +203,18 @@
     if (aberto) h += detalheHtml(r);
     return h + '</article>';
   }
+  // carro curto para a frase: família + 1ª palavra do modelo ("ECLIPSE CROSS HPE-S")
+  function carroCurto(ve) {
+    if (!ve || !ve.carro) return '';
+    var fam = ve.familia || '', resto = fam && ve.carro.indexOf(fam) === 0 ? ve.carro.slice(fam.length).trim() : '';
+    return fam ? (fam + (resto ? ' ' + resto.split(/\s+/)[0] : '')) : ve.carro;
+  }
   function fraseAbordagem(r, d) {
-    var fin = d && d.financiamento || {}, v = d && d.venda, balao = r.tipo && r.tipo.indexOf('BALAO') >= 0, p = [];
-    if (v) {
-      p.push('Comprou ' + (v.modelo ? 'um ' + esc(v.modelo) : 'o carro') + (v.data_venda ? ' em ' + mesAno(v.data_venda) : '') + (v.valor_venda != null ? ' por ' + brl0(v.valor_venda) : '') +
-        (v.entrada != null && v.entrada > 0 ? ', com ' + brl0(v.entrada) + ' de entrada' : '') + '.');
+    var fin = d && d.financiamento || {}, ve = d && d.veiculo, v = d && d.venda, balao = r.tipo && r.tipo.indexOf('BALAO') >= 0, p = [];
+    if (ve && ve.carro) {
+      var quando = (v && v.data_venda) || r.data_contrato;
+      p.push('Comprou um ' + esc(carroCurto(ve)) + ' em ' + mesAno(quando) + (ve.valor != null ? ' por ' + brl0(ve.valor) : '') +
+        (ve.entrada != null ? ', com ' + (ve.entrada_aproximada ? 'cerca de ' : '') + brl0(ve.entrada) + ' de entrada' : '') + '.');
     } else {
       p.push('Financiou ' + (fin.valor_financiado != null ? brl0(fin.valor_financiado) : 'o carro') + ' em ' + mesAno(r.data_contrato) + (r.banco ? ' pelo ' + esc(r.banco) : '') + '.');
     }
@@ -219,7 +226,7 @@
     var d = S.det[r.op_codigo], a = andamento(r), g = gestor();
     if (!d) return '<div class="pspDet"><div class="modLoadingState">Carregando detalhes…</div></div>';
     if (d.erro) return '<div class="pspDet"><div class="modErrorState">' + esc(d.erro) + '</div></div>';
-    var fin = d.dados.financiamento || {}, v = d.dados.venda, balao = r.tipo && r.tipo.indexOf('BALAO') >= 0;
+    var fin = d.dados.financiamento || {}, v = d.dados.venda, ve = d.dados.veiculo, balao = r.tipo && r.tipo.indexOf('BALAO') >= 0;
     var tarifas = fin.valor_financiado_fonte === 'COM_TARIFAS' ? ' <span class="pspTag" title="Sem o valor líquido da venda: valor da Base 03, com tarifas embutidas">com tarifas</span>' : '';
     var h = '<div class="pspDet" role="region" aria-label="Detalhes de ' + esc(r.cliente) + '">' +
       '<p class="pspFrase">' + fraseAbordagem(r, d.dados) + '</p>' +
@@ -232,11 +239,11 @@
       '<dt>Contrato</dt><dd>' + dt(fin.data_contrato) + (fin.data_contrato_estimada ? ' <span class="pspTag" title="A carga diária não traz a data do contrato: usamos a data de inclusão">estimada</span>' : '') + '</dd>' +
       '<dt>Fim</dt><dd>' + dt(fin.data_fim) + '</dd>' +
       (balao ? '<dt>Parcela final</dt><dd class="pspOuro">' + brl(fin.balao_valor) + ' em ' + dt(fin.balao_data) + '</dd>' : '') +
-      '</dl></section><section><h4>Venda</h4>' +
-      (v ? '<dl><dt>Carro</dt><dd>' + esc(v.modelo || '—') + '</dd><dt>Valor de venda</dt><dd>' + brl(v.valor_venda) + (v.data_venda ? ' <span class="pspMini">em ' + dt(v.data_venda) + '</span>' : '') + '</dd>' +
-            '<dt>Entrada</dt><dd>' + brl(v.entrada) + (v.entrada_fonte === 'COM_TARIFAS' ? ' <span class="pspTag">com tarifas</span>' : '') + '</dd>' +
-            (g && r.ligacao ? '<dt>Ligação</dt><dd>pelo ' + (r.ligacao === 'DOCUMENTO' ? 'documento' : 'nome') + ' do cliente</dd>' : '') + '</dl>'
-         : '<p class="pspVazio">Dados da venda não disponíveis para este contrato.</p>') +
+      '</dl></section><section><h4>Veículo</h4>' +
+      (ve ? '<dl><dt>Carro</dt><dd>' + esc(ve.carro || '—') + '</dd><dt>Valor do veículo</dt><dd>' + brl(ve.valor) + (v && v.data_venda ? ' <span class="pspMini">venda em ' + dt(v.data_venda) + '</span>' : '') + '</dd>' +
+            (ve.entrada != null ? '<dt>Entrada</dt><dd>' + brl(ve.entrada) + (ve.entrada_aproximada ? ' <span class="pspTag" title="Valor do veículo menos o financiado da Base 03, que inclui tarifas e às vezes acessórios">aproximada</span>' : '') + '</dd>' : '') +
+            (g && r.ligacao ? '<dt>Ligação</dt><dd>' + (r.ligacao === 'FANDI' ? 'pelo vendedor informado no FANDI' : 'pelo ' + (r.ligacao === 'DOCUMENTO' ? 'documento' : 'nome') + ' do cliente') + '</dd>' : '') + '</dl>'
+         : '<p class="pspVazio">Dados do veículo não disponíveis para este contrato.</p>') +
       '</section></div>' +
       '<footer class="pspDetRodape"><div class="pspDoc">' +
       (d.revelado ? '<span class="pspDocTxt">' + esc(d.revelado) + '</span> <span class="pspMini">consulta registrada</span>'
