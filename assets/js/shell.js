@@ -127,7 +127,8 @@
     'brabus-intelligence': 'NX_BRABUS_INTELLIGENCE_PAGE',
     'shell-admin': 'NX_SHELL_ADMIN_PAGE',
     avaliacoes: 'NX_AVALIACOES_PAGE',
-    'analise-faturamentos': 'NX_ANALISE_FATURAMENTOS_PAGE'
+    'analise-faturamentos': 'NX_ANALISE_FATURAMENTOS_PAGE',
+    prospeccao: 'NX_PROSPECCAO_PAGE'
   };
 
   var hasRenderedOnce = false;
