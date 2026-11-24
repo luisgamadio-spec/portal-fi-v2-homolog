@@ -483,3 +483,24 @@ button.fatPagNum:focus-visible { outline: var(--focus-ring); outline-offset: 2px
   .fatGrupo .fatTabela { display: none; }
   .fatGrupo .fatCartoes { display: block; }
 }
+/* 23/11 (Luis, 4º ajuste): loja, banco e conta (e o modelo em FATURADOS) DIVIDEM o espaço que sobra — em tela larga ficam em
+   uma linha só; a quebra entre palavras vale só quando não couber */
+.fatTabPagas col.pLoja, .fatTabPagas col.pBanco, .fatTabPagas col.pConta { width: auto; }
+.fatGrupo .fatTab:not(.fatTabPagas) col.cModelo, .fatGrupo .fatTab:not(.fatTabPagas) col.cLoja, .fatGrupo .fatTab:not(.fatTabPagas) col.cBanco { width: auto; }
+/* telas largas (1420 px ou mais, com folga para a barra de rolagem vertical): loja, banco e conta com larguras proporcionais —
+   cabem em uma linha (ex.: "MITSUBISHI TURBO") e o espaço que sobra se distribui sem buraco entre loja e banco */
+@media (min-width: 1420px) {
+  .fatTabPagas col.pLoja { width: 11%; } .fatTabPagas col.pBanco { width: 13.5%; } .fatTabPagas col.pConta { width: 10%; }
+  .fatGrupo .fatTab:not(.fatTabPagas) col.cLoja { width: 9%; } .fatGrupo .fatTab:not(.fatTabPagas) col.cBanco { width: 13.5%; }
+}
+/* FATURADOS: abaixo de 1366 px o Modelo (que ocuparia 3 linhas) sai da lista e continua no "+ detalhes" */
+@media (max-width: 1365px) {
+  .fatGrupo .fatTab .fatModelo { display: none; }
+}
+/* cabeçalhos das colunas de data e valor: nunca cortados ("FATURAMENTO" inteiro) */
+.fatGrupo .fatTab thead th { text-overflow: clip; }
+.fatGrupo .fatTab thead th.fatNum { padding-left: 4px; padding-right: 8px; letter-spacing: .02em; }
+.fatTabPagas col.pData { width: 88px; } .fatTabPagas col.pValor { width: 114px; } .fatTabPagas col.pCred { width: 114px; }
+.fatGrupo .fatTab:not(.fatTabPagas) col.cData { width: 88px; } .fatGrupo .fatTab:not(.fatTabPagas) col.cValor { width: 96px; }
+/* cabeçalhos quebram entre palavras ("DIAS / ÚTEIS", "FATURADA / EM") em vez de cortar */
+.fatGrupo .fatTab thead th { white-space: normal; overflow-wrap: normal; line-height: 1.25; vertical-align: bottom; }
