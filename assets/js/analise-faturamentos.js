@@ -252,7 +252,8 @@
   }
   // a linha (ou o cartão) inteira abre o "+ detalhes"; os botões dentro dela continuam com a própria ação
   function abre(r) { return ' data-acao="detalhe" data-id="' + esc(r._k) + '" tabindex="0" aria-label="' + esc('Abrir os detalhes da proposta ' + chassiDe(r)) + '"'; }
-  function bancoTxt(r) { return '<span class="fatCorta" title="' + esc(r.banco || '—') + '">' + esc(r.banco || '—') + '</span>' + marcaSubs(r); }
+  // banco: quebra em duas linhas em vez de abreviar; o nome completo também fica ao passar o mouse
+  function bancoTxt(r) { return '<span class="fatQuebra" title="' + esc(r.banco || '—') + '">' + esc(r.banco || '—') + '</span>' + marcaSubs(r); }
   function editarLink(r, acao, rotulo) {
     return r.pode_preencher ? '<button type="button" class="fatEditar" data-acao="' + acao + '" data-id="' + esc(r._k) + '" aria-label="' + esc(rotulo) + '">Editar</button>' : '';
   }
@@ -387,12 +388,12 @@
     var p = r.pagamento;
     return '<tr class="fatLinha fatLinhaPaga fatAbre' + (aCompletar(r) ? ' fatFalta' : '') + '"' + abre(r) + '>' +
       '<td class="fatMono"><span class="fatChassi">' + esc(chassiDe(r)) + '</span>' + seloOrigem(r) + '</td>' +
-      '<td class="fatCorta" title="' + esc(loja(r.loja)) + '">' + esc(loja(r.loja)) + '</td>' +
+      '<td class="fatQuebra" title="' + esc(loja(r.loja)) + '">' + esc(loja(r.loja)) + '</td>' +
       '<td class="fatColBanco">' + bancoTxt(r) + '</td>' +
       '<td class="fatNum">' + finTxt(r) + '</td>' +
-      '<td class="fatNum">' + esc(data(r.faturamento)) + '</td>' +
-      '<td class="fatNum">' + (p ? esc(data(p.data_credito)) : '<span class="modMuted">—</span>') + '</td>' +
-      '<td class="fatColConta">' + (p ? '<span class="fatCorta" title="' + esc(loja(p.conta_loja)) + '">' + esc(loja(p.conta_loja)) + '</span>' + marcaOutra(r) : '<span class="modMuted">—</span>') + '</td>' +
+      '<td class="fatNum fatOpc">' + esc(data(r.faturamento)) + '</td>' +
+      '<td class="fatNum fatOpc">' + (p ? esc(data(p.data_credito)) : '<span class="modMuted">—</span>') + '</td>' +
+      '<td class="fatColConta">' + (p ? '<span class="fatQuebra" title="' + esc(loja(p.conta_loja)) + '">' + esc(loja(p.conta_loja)) + '</span>' + marcaOutra(r) : '<span class="modMuted">—</span>') + '</td>' +
       '<td class="fatNum">' + creditoTxt(r) + '</td>' +
       '<td class="fatColSit"><div class="fatSitLinha">' + botaoPag(r) + botaoReb(r) + faltaTxt(r) + '</div></td>' +
       '<td class="fatColSeta">' + SETA + '</td></tr>';
@@ -418,9 +419,9 @@
     var h = '<section class="fatLista"><h2 class="modSectionTitle">' + tit + ' <span class="modMuted">(' + lista.length + ')</span></h2>';
     if (!lista.length) return h + '<div class="modEmptyState">' + (S.filtros.sit === 'COMPLETAR' ? 'Nenhuma proposta paga com dados a completar.' : 'Nenhuma proposta paga com esses filtros.') + '</div></section>';
     h += '<div class="fatGrupo fatPagas"><div class="fatTabela"><table class="fatTab fatTabPagas"><colgroup><col class="pChassi"><col class="pLoja"><col class="pBanco">' +
-      '<col class="pValor"><col class="pData"><col class="pData"><col class="pConta"><col class="pCred"><col class="pSit"><col class="pSeta"></colgroup>' +
-      '<thead><tr><th>Chassi</th><th>Loja</th><th>Banco</th><th class="fatNum">Financiado</th><th class="fatNum">Faturamento</th>' +
-      '<th class="fatNum">Crédito em</th><th>Conta (loja)</th><th class="fatNum">Valor creditado</th><th>Situação</th><th class="fatColSeta"><span class="fatSr">Abrir detalhes</span></th></tr></thead><tbody>' +
+      '<col class="pValor"><col class="pData fatOpc"><col class="pData fatOpc"><col class="pConta"><col class="pCred"><col class="pSit"><col class="pSeta"></colgroup>' +
+      '<thead><tr><th>Chassi</th><th>Loja</th><th>Banco</th><th class="fatNum">Financiado</th><th class="fatNum fatOpc">Faturamento</th>' +
+      '<th class="fatNum fatOpc">Crédito em</th><th>Conta (loja)</th><th class="fatNum">Valor creditado</th><th>Situação</th><th class="fatColSeta"><span class="fatSr">Abrir detalhes</span></th></tr></thead><tbody>' +
       lista.map(linhaPagaHtml).join('') + '</tbody></table></div>' +
       '<ul class="fatCartoes">' + lista.map(cartaoPagoHtml).join('') + '</ul></div>';
     return h + '<p class="modMuted fatNota">Pagas segundo a atualização dos dados do banco, faturadas a partir de ' + esc(corteTxt()) + '. ' +
@@ -510,11 +511,11 @@
     return '<tr class="fatLinha fatAbre fat' + r.faixa + (aCompletar(r) ? ' fatFalta' : '') + '"' + abre(r) + '>' +
       '<td class="fatColDias"><b>' + esc(r.dias) + '</b></td>' +
       '<td class="fatMono"><span class="fatChassi">' + esc(chassiDe(r)) + '</span>' + seloOrigem(r) + '</td>' +
-      '<td class="fatCorta" title="' + esc(seLigado(r, r.modelo)) + '">' + esc(seLigado(r, r.modelo)) + '</td>' +
-      '<td class="fatCorta" title="' + esc(loja(r.loja)) + '">' + esc(loja(r.loja)) + '</td>' +
+      '<td class="fatQuebra fatOpc" title="' + esc(seLigado(r, r.modelo)) + '">' + esc(seLigado(r, r.modelo)) + '</td>' +
+      '<td class="fatQuebra" title="' + esc(loja(r.loja)) + '">' + esc(loja(r.loja)) + '</td>' +
       '<td class="fatColBanco">' + bancoTxt(r) + '</td>' +
       '<td class="fatNum">' + finTxt(r, brl) + '</td>' +
-      '<td class="fatNum">' + esc(fatTxt(r)) + '</td>' +
+      '<td class="fatNum fatOpc">' + esc(fatTxt(r)) + '</td>' +
       '<td class="fatColJust">' + estadoJust(r) + estadoRetorno(r) + '</td>' +
       '<td class="fatColSit"><div class="fatSitLinha">' + acoesLinha(r) + faltaTxt(r) + '</div></td>' +
       '<td class="fatColSeta">' + SETA + '</td></tr>';
@@ -539,10 +540,10 @@
       if (!g.length) return;
       h += '<div class="fatGrupo fat' + x.v + '"><h3 class="fatGrupoTopo"><span class="fatGrupoNome"><i aria-hidden="true"></i>' + esc(x.label) +
         ' <small>' + esc(x.dias) + '</small></span><span class="fatGrupoTot">' + g.length + ' proposta' + (g.length > 1 ? 's' : '') + ' · ' + esc(brl(soma(g))) + '</span></h3>' +
-        '<div class="fatTabela"><table class="fatTab"><colgroup><col class="cDias"><col class="cChassi"><col class="cModelo"><col class="cLoja"><col class="cBanco">' +
-        '<col class="cValor"><col class="cData"><col class="cJust"><col class="cAcao"><col class="cSeta"></colgroup>' +
-        '<thead><tr><th class="fatColDias">Dias úteis</th><th>Chassi</th><th>Modelo</th><th>Loja</th><th>Banco</th><th class="fatNum">Financiado</th>' +
-        '<th class="fatNum">Faturamento</th><th>Justificativa</th><th>Ações</th><th class="fatColSeta"><span class="fatSr">Abrir detalhes</span></th></tr></thead><tbody>' +
+        '<div class="fatTabela"><table class="fatTab"><colgroup><col class="cDias"><col class="cChassi"><col class="cModelo fatOpc"><col class="cLoja"><col class="cBanco">' +
+        '<col class="cValor"><col class="cData fatOpc"><col class="cJust"><col class="cAcao"><col class="cSeta"></colgroup>' +
+        '<thead><tr><th class="fatColDias">Dias úteis</th><th>Chassi</th><th class="fatOpc">Modelo</th><th>Loja</th><th>Banco</th><th class="fatNum">Financiado</th>' +
+        '<th class="fatNum fatOpc">Faturamento</th><th>Justificativa</th><th>Ações</th><th class="fatColSeta"><span class="fatSr">Abrir detalhes</span></th></tr></thead><tbody>' +
         g.map(linhaHtml).join('') + '</tbody></table></div>' +
         '<ul class="fatCartoes">' + g.map(cartaoHtml).join('') + '</ul></div>';
     });

@@ -448,3 +448,38 @@ button.fatPagNum:focus-visible { outline: var(--focus-ring); outline-offset: 2px
 
 .fatCartaoAcoes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .fatCartaoAcoes > button { flex: 0 1 auto !important; }
+
+/* ==== 23/11/2026 (Luis, 3º acerto): nada cortado e nenhuma rolagem lateral (nem na página nem dentro da tabela) ====
+   indicadores/botões EMPILHADOS na coluna da situação; banco/loja/conta QUEBRAM a linha em vez de abreviar;
+   chassi menor; em telas mais estreitas somem primeiro as colunas menos importantes (.fatOpc — continuam no "+ detalhes")
+   e, abaixo de 1100 px, a tabela dá lugar aos cartões. */
+.fatGrupo .fatTabela { overflow: visible; }
+.fatGrupo .fatTab, .fatGrupo .fatTab.fatTabPagas { min-width: 0 !important; width: 100%; }
+.fatGrupo .fatTab td { height: 58px; }
+.fatGrupo .fatTab td.fatQuebra, .fatGrupo .fatTab .fatQuebra { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: normal; word-break: normal; line-height: 1.25; }
+.fatGrupo .fatTab td.fatColBanco, .fatGrupo .fatTab td.fatColConta { white-space: normal; overflow: visible; text-overflow: clip; }
+.fatGrupo .fatTab td.fatColBanco > .fatQuebra, .fatGrupo .fatTab td.fatColConta > .fatQuebra { display: block; }
+.fatGrupo .fatTab td.fatMono { font-size: 0.625rem; overflow: visible; text-overflow: clip; }
+.fatGrupo .fatTab .fatChassi { overflow: visible; text-overflow: clip; letter-spacing: 0; }
+/* situação/ações: um item = centralizado na vertical; dois = empilhados, alinhados à esquerda */
+.fatGrupo .fatTab td.fatColSit { overflow: visible; white-space: nowrap; }
+.fatGrupo .fatTab .fatSitLinha { flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; flex-wrap: nowrap; }
+.fatGrupo .fatTab .fatSitLinha > button { padding: 3px 8px !important; }
+.fatGrupo .fatTab .fatColJust .fatEstado { overflow: visible; }
+.fatGrupo .fatTab .fatColJust .fatEstado > span { overflow: visible; text-overflow: clip; }
+/* larguras — PAGOS (chassi mais estreito, situação mais larga) */
+.fatTabPagas col.pChassi { width: 130px; } .fatTabPagas col.pBanco { width: 110px; } .fatTabPagas col.pValor { width: 118px; }
+.fatTabPagas col.pData { width: 82px; } .fatTabPagas col.pConta { width: 96px; } .fatTabPagas col.pCred { width: 118px; } .fatTabPagas col.pSit { width: 236px; }
+.fatGrupo .fatTab td { text-overflow: clip; }
+/* larguras — FATURADOS */
+.fatTab col.cDias { width: 58px; } .fatTab col.cChassi { width: 130px; } .fatTab col.cLoja { width: 100px; } .fatTab col.cBanco { width: 110px; }
+.fatTab col.cValor { width: 94px; } .fatTab col.cData { width: 84px; } .fatTab col.cJust { width: 206px; } .fatTab col.cAcao { width: 176px; }
+/* telas médias: somem as colunas menos importantes */
+@media (max-width: 1279px) {
+  .fatGrupo .fatTab .fatOpc { display: none; }
+}
+/* abaixo de 1100 px: cartões no lugar da tabela (sem rolagem interna) */
+@media (max-width: 1100px) {
+  .fatGrupo .fatTabela { display: none; }
+  .fatGrupo .fatCartoes { display: block; }
+}
