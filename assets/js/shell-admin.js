@@ -56,6 +56,13 @@
   function safeErrorMessage() {
     return 'Não foi possível concluir a operação agora. Tente novamente.';
   }
+  // 25/11/2026 (Luis): recusa de REGRA vinda do banco (22023 validação, 23P01 conflito de cadeia, P0002 não encontrado) --
+  // o texto é escrito pelo próprio banco, em português, para o Master; mostra o motivo real. O resto continua genérico.
+  function scMotivoServidor(err) {
+    var c = String((err && err.codigo) || '');
+    if ((c === '22023' || c === '23P01' || c === 'P0002') && err.message) return String(err.message);
+    return safeErrorMessage();
+  }
 
   // ---------- module state ----------
   var currentSection = 'usuarios'; // only implemented section this Phase
@@ -2129,6 +2136,10 @@
     if (deptCancelBtn) deptCancelBtn.addEventListener('click', scCloseModal);
     var deptSaveBtn = document.getElementById('scEditDeptSaveBtn');
     if (deptSaveBtn) deptSaveBtn.addEventListener('click', scEditDeptSaveHandler);
+    var datesCancelBtn = document.getElementById('scEditDatesCancelBtn');
+    if (datesCancelBtn) datesCancelBtn.addEventListener('click', scCloseModal);
+    var datesSaveBtn = document.getElementById('scEditDatesSaveBtn');
+    if (datesSaveBtn) datesSaveBtn.addEventListener('click', scEditDatesSaveHandler);
     var successClose = document.getElementById('scSuccessCloseBtn');
     if (successClose) successClose.addEventListener('click', scCloseModalAndRefresh);
     var errorClose = document.getElementById('scErrorCloseBtn');
@@ -3912,11 +3923,12 @@
     return '<tr class="scRow" data-id="' + esc(r.id) + '">' +
       '<td><b>' + esc(r.nome_vendedor || '-') + '</b>' + (r.cpf_vendedor ? '<br><span class="maSubtle">' + esc(r.cpf_vendedor) + '</span>' : '') + '</td>' +
       '<td>' + esc(r.loja_origem || '-') + ' → ' + esc(r.loja_destino || '-') + '</td>' +
-      '<td>' + esc(SC_VM.fmtDateBR(r.data_inicio_origem)) + ' → ' + esc(SC_VM.fmtDateBR(r.data_fim_origem)) + '</td>' +
-      '<td>' + esc(SC_VM.fmtDateBR(r.data_inicio_destino)) + ' (em aberto)</td>' +
+      '<td><span class="scData">' + esc(SC_VM.fmtDateBR(r.data_inicio_origem)) + ' →</span> <span class="scData">' + esc(SC_VM.fmtDateBR(r.data_fim_origem)) + '</span></td>' +
+      '<td><span class="scData">' + esc(SC_VM.fmtDateBR(r.data_inicio_destino)) + '</span> <span class="scData maSubtle">(em aberto)</span></td>' +
       '<td>' + esc(scDeptText(r)) + '</td>' +
       '<td>' + ativoBadge + '</td>' +
       '<td class="adminActions"><div class="scActions">' +
+      '<button type="button" class="modBtnGhost scEditDatesBtn" data-id="' + esc(r.id) + '">Corrigir datas</button>' +
       '<button type="button" class="modBtnGhost scEditDeptBtn" data-id="' + esc(r.id) + '">Editar departamentos</button>' +
       '<button type="button" class="modBtnGhost scToggleActiveBtn" data-id="' + esc(r.id) + '" data-active="' + (r.ativo !== false) + '">' + (r.ativo !== false ? 'Inativar' : 'Ativar') + '</button>' +
       '<button type="button" class="modBtnGhost scArchiveBtn" data-id="' + esc(r.id) + '">Arquivar</button>' +
@@ -3956,7 +3968,7 @@
   function scDesktopTableHtml() {
     return '<div class="scStoreDesktopOnly"><div class="modTableWrap"><table class="modTable scStoreTable">' +
       scColgroupHtml() +
-      '<thead><tr><th scope="col">Vendedor</th><th scope="col">Loja origem → destino</th><th scope="col">Período origem</th><th scope="col">Início destino</th><th scope="col">Departamentos</th><th scope="col">Status</th><th scope="col">Ações</th></tr></thead>' +
+      '<thead><tr><th scope="col">Vendedor</th><th scope="col">Lojas (origem → destino)</th><th scope="col">Período na origem</th><th scope="col">Início no destino</th><th scope="col">Departamentos</th><th scope="col">Status</th><th scope="col">Ações</th></tr></thead>' +
       '<tbody>' + scState.storeChanges.map(scRowHtml).join('') + '</tbody></table></div></div>';
   }
   function scMobileCardHtml(r) {
@@ -3972,6 +3984,7 @@
       '<div class="maMobileMeta">Departamentos: ' + esc(scDeptText(r)) + '</div>' +
       ativoBadge +
       '<div class="scActions">' +
+      '<button type="button" class="modBtnGhost scEditDatesBtn" data-id="' + esc(r.id) + '">Corrigir datas</button>' +
       '<button type="button" class="modBtnGhost scEditDeptBtn" data-id="' + esc(r.id) + '">Editar departamentos</button>' +
       '<button type="button" class="modBtnGhost scToggleActiveBtn" data-id="' + esc(r.id) + '" data-active="' + (r.ativo !== false) + '">' + (r.ativo !== false ? 'Inativar' : 'Ativar') + '</button>' +
       '<button type="button" class="modBtnGhost scArchiveBtn" data-id="' + esc(r.id) + '">Arquivar</button>' +
@@ -4181,6 +4194,7 @@
     var m = scState.modal;
     if (m.kind === 'confirm') renderNxModal('Confirmar arquivamento', scConfirmBodyHtml(m), scCancelConfirm);
     else if (m.kind === 'editDepartments') renderNxModal('Editar departamentos', scEditDeptBodyHtml(m), scCloseModal);
+    else if (m.kind === 'editDates') renderNxModal('Corrigir datas da mudança de loja', scEditDatesBodyHtml(m), scCloseModal);
     else if (m.kind === 'success') renderNxModal((scHomolog() ? '🧪 ' : '✅ ') + 'Mudança de loja atualizada', scSuccessBodyHtml(m), scCloseModalAndRefresh);
     else if (m.kind === 'error') renderNxModal('Erro', scErrorBodyHtml(m), scCloseModal);
     wireScModalInteraction();
@@ -4198,6 +4212,48 @@
       '<button type="button" class="modBtnGhost" id="scConfirmCancelBtn">Cancelar</button>' +
       '<button type="button" class="modBtn" id="scConfirmArchiveBtn"' + (inFlight.scAction ? ' disabled' : '') + '>Arquivar registro</button>' +
       '</div>';
+  }
+  // 25/11/2026 (Luis): corrigir as datas de uma mudança sem inativar e criar outra (master_admin_manage SET_DATES;
+  // o banco confere as mesmas regras de encadeamento da criação e registra na auditoria).
+  function scEditDatesBodyHtml(m) {
+    var r = m.record;
+    return '<div class="gbRow"><span>Vendedor</span><b>' + esc(r.nome_vendedor || '-') + '</b></div>' +
+      '<div class="gbRow"><span>Lojas</span><b>' + esc(r.loja_origem || '-') + ' → ' + esc(r.loja_destino || '-') + '</b></div>' +
+      '<label for="scEditIniOrigem">Início na origem</label><input type="date" id="scEditIniOrigem" value="' + esc(String(r.data_inicio_origem || '').slice(0, 10)) + '">' +
+      '<label for="scEditFimOrigem">Último dia na origem</label><input type="date" id="scEditFimOrigem" value="' + esc(String(r.data_fim_origem || '').slice(0, 10)) + '">' +
+      '<label for="scEditIniDestino">Primeiro dia no destino</label><input type="date" id="scEditIniDestino" value="' + esc(String(r.data_inicio_destino || '').slice(0, 10)) + '">' +
+      '<p class="note">O primeiro dia no destino tem de ser o dia seguinte ao último dia na origem. A alteração fica registrada na auditoria.</p>' +
+      '<p id="scEditDatesMsg" class="maSubtle gbErrText" role="status"></p>' +
+      '<div class="adminModalActions">' +
+      '<button type="button" class="modBtnGhost" id="scEditDatesCancelBtn">Cancelar</button>' +
+      '<button type="button" class="modBtn" id="scEditDatesSaveBtn"' + (inFlight.scAction ? ' disabled' : '') + '>Salvar datas</button>' +
+      '</div>';
+  }
+  function scEditDatesSaveHandler() {
+    if (inFlight.scAction) return;
+    var m = scState.modal;
+    if (!m || m.kind !== 'editDates') return;
+    var v = function (id) { return (document.getElementById(id) || {}).value || ''; };
+    var ini = v('scEditIniOrigem'), fim = v('scEditFimOrigem'), dest = v('scEditIniDestino');
+    var msg = document.getElementById('scEditDatesMsg');
+    if (!ini || !fim || !dest) { if (msg) msg.textContent = 'Informe as três datas.'; return; }
+    if (fim < ini) { if (msg) msg.textContent = 'O último dia na origem não pode ser antes do início na origem.'; return; }
+    if (dest !== SC_VM.addOneDay(fim)) { if (msg) msg.textContent = 'O primeiro dia no destino tem de ser ' + SC_VM.fmtDateBR(SC_VM.addOneDay(fim)) + ' (o dia seguinte ao último dia na origem).'; return; }
+    inFlight.scAction = true;
+    var btn = document.getElementById('scEditDatesSaveBtn');
+    if (btn) btn.disabled = true;
+    SC_PROVIDER.setDates(m.record.id, ini, fim, dest).then(
+      function () {
+        inFlight.scAction = false;
+        scState.modal = { kind: 'success', message: 'Datas corrigidas com sucesso.' };
+        renderScModalRoot();
+      },
+      function (err) {
+        inFlight.scAction = false;
+        if (msg) msg.textContent = 'Não foi possível salvar: ' + scMotivoServidor(err);
+        if (btn) btn.disabled = false;
+      }
+    );
   }
   // Real shared-modal form for SET_DEPARTMENTS -- deliberately NOT
   // V1's native window.prompt() (PM-5F Gate 55).
@@ -4240,7 +4296,7 @@
       },
       function (err) {
         inFlight.scAction = false;
-        scState.modal = { kind: 'error', message: safeErrorMessage() };
+        scState.modal = { kind: 'error', message: scMotivoServidor(err) };
         renderScModalRoot();
       }
     );
@@ -4273,7 +4329,7 @@
         // explicação segura do motivo.
         var body = (err && err.state === 'CONFLICT')
           ? 'Esta arquivação conflita com outra mudança de alocação já registrada para o mesmo período.'
-          : (STATE_COPY[err && err.state] || STATE_COPY.RPC_ERROR).body;
+          : (scMotivoServidor(err) !== safeErrorMessage() ? scMotivoServidor(err) : (STATE_COPY[err && err.state] || STATE_COPY.RPC_ERROR).body);
         if (msg) msg.textContent = 'Erro ao arquivar: ' + body;
         if (btn) btn.disabled = false;
       }
@@ -4298,7 +4354,7 @@
       function (err) {
         inFlight.scAction = false;
         var msg = document.getElementById('scEditDeptMsg');
-        if (msg) msg.textContent = 'Erro ao salvar: ' + safeErrorMessage();
+        if (msg) msg.textContent = 'Erro ao salvar: ' + scMotivoServidor(err);
         if (btn) btn.disabled = false;
       }
     );
@@ -4330,7 +4386,7 @@
       },
       function (err) {
         inFlight.scAction = false;
-        f.error = safeErrorMessage();
+        f.error = scMotivoServidor(err);
         if (btn) btn.disabled = false;
         renderPanel();
       }
@@ -6251,6 +6307,14 @@
         var record = scRecordById(el.getAttribute('data-id'));
         if (!record) return;
         scState.modal = { kind: 'editDepartments', record: record };
+        renderScModalRoot();
+      });
+    });
+    document.querySelectorAll('.scEditDatesBtn').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var record = scRecordById(el.getAttribute('data-id'));
+        if (!record) return;
+        scState.modal = { kind: 'editDates', record: record };
         renderScModalRoot();
       });
     });
