@@ -2140,6 +2140,15 @@
     if (datesCancelBtn) datesCancelBtn.addEventListener('click', scCloseModal);
     var datesSaveBtn = document.getElementById('scEditDatesSaveBtn');
     if (datesSaveBtn) datesSaveBtn.addEventListener('click', scEditDatesSaveHandler);
+    var editFim = document.getElementById('scEditFimOrigem');
+    if (editFim) {
+      var atualizaDestinoEdit = function () {
+        var t = document.getElementById('scEditDestinoTxt');
+        if (t) t.textContent = editFim.value ? SC_VM.fmtDateBR(SC_VM.addOneDay(editFim.value)) : '—';
+      };
+      editFim.addEventListener('input', atualizaDestinoEdit);
+      editFim.addEventListener('change', atualizaDestinoEdit);
+    }
     var successClose = document.getElementById('scSuccessCloseBtn');
     if (successClose) successClose.addEventListener('click', scCloseModalAndRefresh);
     var errorClose = document.getElementById('scErrorCloseBtn');
@@ -4085,7 +4094,8 @@
     if ((v = val('scLojaDestino')) !== null) f.lojaDestino = v.trim().toUpperCase();
     if ((v = val('scIniOrigem')) !== null) f.dataInicioOrigem = v;
     if ((v = val('scFimOrigem')) !== null) f.dataFimOrigem = v;
-    if ((v = val('scIniDestino')) !== null) f.dataInicioDestino = v;
+    // 25/11/2026: o início do destino é sempre o dia seguinte ao fim da origem (não é mais digitado)
+    f.dataInicioDestino = f.dataFimOrigem ? SC_VM.addOneDay(f.dataFimOrigem) : '';
     if ((v = val('scObs')) !== null) f.observacao = v.trim();
     if ((v = val('scDeptOrigem')) !== null) f.departamentoOrigem = v;
     if ((v = val('scDeptDestino')) !== null) f.departamentoDestino = v;
@@ -4143,8 +4153,8 @@
         : '') +
       '<label for="scFimOrigem">Data final da origem</label>' +
       '<input type="date" id="scFimOrigem" value="' + esc(f.dataFimOrigem) + '">' +
-      '<label for="scIniDestino">Data inicial do destino</label>' +
-      '<input type="date" id="scIniDestino" value="' + esc(f.dataInicioDestino) + '">' +
+      '<p class="scDestinoInfo">Primeiro dia no destino: <b id="scIniDestinoTxt">' + esc(f.dataFimOrigem ? SC_VM.fmtDateBR(SC_VM.addOneDay(f.dataFimOrigem)) : '—') + '</b>' +
+      '<span class="maSubtle"> (sempre o dia seguinte à data final da origem)</span></p>' +
       '<label for="scObs">Observação (opcional)</label>' +
       '<input type="text" id="scObs" value="' + esc(f.observacao) + '">' +
       '<label for="scDeptOrigem">Departamento de origem (opcional)</label>' +
@@ -4217,28 +4227,31 @@
   // o banco confere as mesmas regras de encadeamento da criação e registra na auditoria).
   function scEditDatesBodyHtml(m) {
     var r = m.record;
-    return '<div class="gbRow"><span>Vendedor</span><b>' + esc(r.nome_vendedor || '-') + '</b></div>' +
+    var fim0 = String(r.data_fim_origem || '').slice(0, 10);
+    return '<div class="scDatesForm">' +
+      '<div class="gbRow"><span>Vendedor</span><b>' + esc(r.nome_vendedor || '-') + '</b></div>' +
       '<div class="gbRow"><span>Lojas</span><b>' + esc(r.loja_origem || '-') + ' → ' + esc(r.loja_destino || '-') + '</b></div>' +
       '<label for="scEditIniOrigem">Início na origem</label><input type="date" id="scEditIniOrigem" value="' + esc(String(r.data_inicio_origem || '').slice(0, 10)) + '">' +
-      '<label for="scEditFimOrigem">Último dia na origem</label><input type="date" id="scEditFimOrigem" value="' + esc(String(r.data_fim_origem || '').slice(0, 10)) + '">' +
-      '<label for="scEditIniDestino">Primeiro dia no destino</label><input type="date" id="scEditIniDestino" value="' + esc(String(r.data_inicio_destino || '').slice(0, 10)) + '">' +
-      '<p class="note">O primeiro dia no destino tem de ser o dia seguinte ao último dia na origem. A alteração fica registrada na auditoria.</p>' +
+      '<label for="scEditFimOrigem">Último dia na origem</label><input type="date" id="scEditFimOrigem" value="' + esc(fim0) + '">' +
+      '<p class="scDestinoInfo">Primeiro dia no destino: <b id="scEditDestinoTxt">' + esc(fim0 ? SC_VM.fmtDateBR(SC_VM.addOneDay(fim0)) : '—') + '</b>' +
+      '<span class="maSubtle"> (sempre o dia seguinte ao último dia na origem)</span></p>' +
+      '<p class="note">A alteração fica registrada na auditoria.</p>' +
       '<p id="scEditDatesMsg" class="maSubtle gbErrText" role="status"></p>' +
       '<div class="adminModalActions">' +
       '<button type="button" class="modBtnGhost" id="scEditDatesCancelBtn">Cancelar</button>' +
       '<button type="button" class="modBtn" id="scEditDatesSaveBtn"' + (inFlight.scAction ? ' disabled' : '') + '>Salvar datas</button>' +
-      '</div>';
+      '</div></div>';
   }
   function scEditDatesSaveHandler() {
     if (inFlight.scAction) return;
     var m = scState.modal;
     if (!m || m.kind !== 'editDates') return;
     var v = function (id) { return (document.getElementById(id) || {}).value || ''; };
-    var ini = v('scEditIniOrigem'), fim = v('scEditFimOrigem'), dest = v('scEditIniDestino');
+    var ini = v('scEditIniOrigem'), fim = v('scEditFimOrigem');
     var msg = document.getElementById('scEditDatesMsg');
-    if (!ini || !fim || !dest) { if (msg) msg.textContent = 'Informe as três datas.'; return; }
+    if (!ini || !fim) { if (msg) msg.textContent = 'Informe o início e o último dia na origem.'; return; }
     if (fim < ini) { if (msg) msg.textContent = 'O último dia na origem não pode ser antes do início na origem.'; return; }
-    if (dest !== SC_VM.addOneDay(fim)) { if (msg) msg.textContent = 'O primeiro dia no destino tem de ser ' + SC_VM.fmtDateBR(SC_VM.addOneDay(fim)) + ' (o dia seguinte ao último dia na origem).'; return; }
+    var dest = SC_VM.addOneDay(fim);   // 25/11: sempre o dia seguinte (preenchido sozinho)
     inFlight.scAction = true;
     var btn = document.getElementById('scEditDatesSaveBtn');
     if (btn) btn.disabled = true;
@@ -4371,7 +4384,8 @@
     if (!f.lojaOrigem || stores.indexOf(f.lojaOrigem) === -1) { f.error = 'Escolha a loja de origem na lista.'; renderPanel(); return; }
     if (!f.lojaDestino || stores.indexOf(f.lojaDestino) === -1) { f.error = 'Escolha a loja de destino na lista.'; renderPanel(); return; }
     if (f.lojaOrigem === f.lojaDestino) { f.error = 'As lojas de origem e destino devem ser diferentes.'; renderPanel(); return; }
-    if (!f.dataInicioOrigem || !f.dataFimOrigem || !f.dataInicioDestino) { f.error = 'Informe as três datas (início/fim da origem e início do destino).'; renderPanel(); return; }
+    f.dataInicioDestino = f.dataFimOrigem ? SC_VM.addOneDay(f.dataFimOrigem) : '';
+    if (!f.dataInicioOrigem || !f.dataFimOrigem) { f.error = 'Informe a data inicial e a data final da origem.'; renderPanel(); return; }
     if (f.dataFimOrigem < f.dataInicioOrigem) { f.error = 'Data final da origem não pode ser anterior à inicial.'; renderPanel(); return; }
     f.error = null;
     inFlight.scAction = true;
@@ -6273,15 +6287,16 @@
     }
     // Início do destino = dia seguinte ao fim da origem (regra do servidor),
     // enquanto o usuário não editar o início do destino à mão.
+    // 25/11/2026: o primeiro dia no destino é informação (sempre o dia seguinte ao fim da origem), atualizada na hora
     var scFimOrigemEl = document.getElementById('scFimOrigem');
-    var scIniDestinoEl = document.getElementById('scIniDestino');
-    if (scIniDestinoEl) scIniDestinoEl.addEventListener('input', function () { if (scState.createForm) scState.createForm.iniDestinoManual = true; });
-    if (scFimOrigemEl && scIniDestinoEl) {
-      scFimOrigemEl.addEventListener('change', function () {
-        var f = scState.createForm;
-        if (!f || f.iniDestinoManual || !scFimOrigemEl.value) return;
-        scIniDestinoEl.value = SC_VM.addOneDay(scFimOrigemEl.value);
-      });
+    if (scFimOrigemEl) {
+      var atualizaDestinoNovo = function () {
+        var t = document.getElementById('scIniDestinoTxt');
+        if (t) t.textContent = scFimOrigemEl.value ? SC_VM.fmtDateBR(SC_VM.addOneDay(scFimOrigemEl.value)) : '—';
+        if (scState.createForm) { scState.createForm.dataFimOrigem = scFimOrigemEl.value; scState.createForm.dataInicioDestino = scFimOrigemEl.value ? SC_VM.addOneDay(scFimOrigemEl.value) : ''; }
+      };
+      scFimOrigemEl.addEventListener('input', atualizaDestinoNovo);
+      scFimOrigemEl.addEventListener('change', atualizaDestinoNovo);
     }
     var scCancelCreateBtn = document.getElementById('scCancelCreateBtn');
     if (scCancelCreateBtn) scCancelCreateBtn.addEventListener('click', function () { scState.createForm = null; renderPanel(); });

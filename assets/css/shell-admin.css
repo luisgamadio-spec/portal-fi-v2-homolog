@@ -854,3 +854,12 @@ col.absColStatus { width: 86px; }    /* badge content ~62px + cell padding, view
 .scStoreTable td { word-break: normal; overflow-wrap: break-word; }
 .scStoreTable .scActions { flex-direction: column; align-items: stretch; }
 .scStoreTable .scActions .modBtnGhost { text-align: center; }
+
+/* 25/11/2026: janela 'Corrigir datas' com os campos no padrão do Portal (o mesmo do formulário de criar), não o branco do navegador */
+.scDatesForm { display: flex; flex-direction: column; gap: 6px; }
+.scDatesForm label { font-size: 0.75rem; color: var(--color-text-secondary); margin-top: 4px; }
+.scDatesForm input[type="date"], .scCreateCard input[type="date"] { padding: 6px 8px; border: 1px solid var(--mod-border-strong); border-radius: var(--radius-sm);
+  background: var(--color-canvas); color: var(--color-text-primary); font: inherit; color-scheme: dark; }
+.scDatesForm input[type="date"]:focus-visible, .scCreateCard input[type="date"]:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+.scDestinoInfo { margin: 6px 0 2px; font-size: 0.875rem; color: var(--color-text-primary); }
+.scDestinoInfo b { font-variant-numeric: tabular-nums; }
